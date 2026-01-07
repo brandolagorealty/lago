@@ -23,39 +23,41 @@ export const handler = async (event: any) => {
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'API Key not configured on Netlify environment variables.' }),
+                body: JSON.stringify({ error: 'API Key not configured on Netlify.' }),
             };
         }
 
+        // Force v1 API and a very specific model name
         const genAI = new GoogleGenerativeAI(API_KEY);
 
-        // Comprehensive fallback strategy for model names
+        // We try to use the most stable model name and API version
         const modelsToTry = [
             'gemini-1.5-flash',
-            'gemini-1.5-flash-latest',
             'gemini-1.5-pro',
-            'gemini-pro',
-            'gemini-1.0-pro'
+            'gemini-pro'
         ];
 
         let lastError = null;
         let finalReply = null;
-        let fallbackLog = [];
 
         for (const modelName of modelsToTry) {
             try {
-                const model = genAI.getGenerativeModel({ model: modelName });
+                // Explicitly set apiVersion to 'v1' instead of 'v1beta'
+                const model = genAI.getGenerativeModel(
+                    { model: modelName },
+                    { apiVersion: 'v1' }
+                );
 
                 const propertyContext = (properties || []).map((p: any) =>
-                    `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}. ${p.description}`
+                    `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
                 ).join('\n');
 
                 const prompt = `
-          You are the AI assistant for Lago Realty, a real estate agency in Zulia, Venezuela.
-          Context - Available Properties:
+          Lago Realty Assistant.
+          Properties:
           ${propertyContext}
-          User Message: "${userMessage}"
-          Reply in the user's language. Keep it under 3 sentences.
+          User: "${userMessage}"
+          Reply concisely in user's language.
         `;
 
                 const result = await model.generateContent(prompt);
@@ -63,12 +65,23 @@ export const handler = async (event: any) => {
                 finalReply = response.text();
 
                 if (finalReply) {
-                    console.log(`Success using model: ${modelName}`);
+                    console.log(`Success with model: ${modelName} on v1 API`);
                     break;
                 }
             } catch (err: any) {
-                console.error(`Attempt with ${modelName} failed:`, err.message);
-                fallbackLog.push(`${modelName}: ${err.message}`);
+                console.error(`Model ${modelName} (v1) failed:`, err.message);
+                lastError = err;
+            }
+        }
+
+        // If v1 fails, try v1beta as a last resort (the default)
+        if (!finalReply) {
+            try {
+                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+                const result = await model.generateContent("Hola");
+                const response = await result.response;
+                finalReply = response.text();
+            } catch (err: any) {
                 lastError = err;
             }
         }
@@ -77,9 +90,9 @@ export const handler = async (event: any) => {
             return {
                 statusCode: 500,
                 body: JSON.stringify({
-                    error: 'Todos los modelos de Google (Flash, Pro) fallaron.',
-                    details: lastError?.message || 'Error desconocido',
-                    log: fallbackLog
+                    error: 'Critical: Gemini API rejected all models and versions.',
+                    details: lastError?.message || 'Check API Key permissions at AI Studio.',
+                    hint: 'Verify that the API Key is from "Google AI Studio" and has "Generative Language API" enabled.'
                 }),
             };
         }
@@ -92,7 +105,7 @@ export const handler = async (event: any) => {
     } catch (error: any) {
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Error interno del servidor', details: error.message }),
+            body: JSON.stringify({ error: 'Server error', details: error.message }),
         };
     }
 };
