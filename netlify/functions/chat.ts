@@ -15,6 +15,9 @@ export const handler = async (event: any) => {
             };
         }
 
+        // Pista segura para que el usuario verifique si Netlify tomó la llave nueva
+        const keyHint = `(Termina en: ...${API_KEY.slice(-4)})`;
+
         const propertyContext = (properties || []).map((p: any) =>
             `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
         ).join('\n');
@@ -27,63 +30,54 @@ export const handler = async (event: any) => {
       Responde de forma breve y amable en español.
     `;
 
-        // List confirmada por el diagnóstico:
-        const MODEL = 'gemini-flash-latest';
-        const URL_V1 = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
+        // Intentamos los modelos que vimos en TU lista de diagnóstico
+        const modelsToTry = [
+            { name: 'gemini-2.0-flash', version: 'v1beta' },
+            { name: 'gemini-flash-latest', version: 'v1' },
+            { name: 'gemini-pro-latest', version: 'v1' }
+        ];
 
         let lastErrorDetails = "";
 
-        console.log("Intentando API v1...");
-        const responseV1 = await fetch(URL_V1, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
-        });
+        for (const m of modelsToTry) {
+            console.log(`Intentando ${m.name} en ${m.version}...`);
+            const URL = `https://generativelanguage.googleapis.com/${m.version}/models/${m.name}:generateContent?key=${API_KEY}`;
 
-        const dataV1 = await responseV1.json();
+            try {
+                const response = await fetch(URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
 
-        if (responseV1.ok) {
-            return {
-                statusCode: 200,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reply: dataV1.candidates[0].content.parts[0].text }),
-            };
-        } else {
-            lastErrorDetails += `Version v1: ${dataV1.error?.message || 'Error desconocido'}. `;
+                const data = await response.json();
+
+                if (response.ok) {
+                    return {
+                        statusCode: 200,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reply: data.candidates[0].content.parts[0].text }),
+                    };
+                } else {
+                    lastErrorDetails += `[${m.name} ${m.version}]: ${data.error?.message || 'Error'}. `;
+                    // Si el error dice "leaked", rompemos el ciclo porque la llave está muerta
+                    if (data.error?.message?.toLowerCase().includes('leaked')) {
+                        break;
+                    }
+                }
+            } catch (err: any) {
+                lastErrorDetails += `[${m.name}] Error de red: ${err.message}. `;
+            }
         }
 
-        // Si falla v1, intentamos v1beta
-        console.log("Intentando API v1beta...");
-        const URL_BETA = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-        const responseBeta = await fetch(URL_BETA, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
-        });
-
-        const dataBeta = await responseBeta.json();
-
-        if (responseBeta.ok) {
-            return {
-                statusCode: 200,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reply: dataBeta.candidates[0].content.parts[0].text }),
-            };
-        } else {
-            lastErrorDetails += `Version v1beta: ${dataBeta.error?.message || 'Error desconocido'}. `;
-        }
-
-        // Si ambos fallan, devolvemos el reporte detallado
         return {
             statusCode: 500,
             body: JSON.stringify({
-                error: 'Google API rechazó todas las versiones.',
+                error: `Error de configuración en Google API. ${keyHint}`,
                 details: lastErrorDetails,
-                hint: 'Verifica que tu API Key tenga habilitado el "Generative Language API" en el Google Cloud Console o que sea una llave válida de AI Studio.'
+                hint: 'Si ves el mensaje "leaked", es que Netlify aún está usando tu llave vieja. Asegúrate de haber guardado la nueva y haber hecho un "Clear cache and deploy site".'
             }),
         };
 
