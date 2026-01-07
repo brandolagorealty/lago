@@ -1,111 +1,95 @@
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 export const handler = async (event: any) => {
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            body: JSON.stringify({ error: 'Method Not Allowed' }),
-        };
+        return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     try {
-        if (!event.body) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ error: 'Missing body' }),
-            };
-        }
-
         const { userMessage, properties } = JSON.parse(event.body);
         const API_KEY = process.env.VITE_GEMINI_API_KEY;
 
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'API Key not configured on Netlify.' }),
+                body: JSON.stringify({ error: 'Falta la API Key en Netlify.' }),
             };
         }
 
-        // Force v1 API and a very specific model name
-        const genAI = new GoogleGenerativeAI(API_KEY);
+        const propertyContext = (properties || []).map((p: any) =>
+            `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
+        ).join('\n');
 
-        // We try to use the most stable model name and API version
-        const modelsToTry = [
-            'gemini-1.5-flash',
-            'gemini-1.5-pro',
-            'gemini-pro'
-        ];
+        const prompt = `
+      Eres el asistente de Lago Realty. Ayuda al usuario a encontrar propiedades.
+      Propiedades disponibles:
+      ${propertyContext}
+      Usuario: "${userMessage}"
+      Responde de forma breve y amable en español.
+    `;
 
-        let lastError = null;
-        let finalReply = null;
+        // Intentamos con la API v1 directamente usando fetch para evitar problemas de la librería
+        const MODEL = 'gemini-1.5-flash';
+        const URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
 
-        for (const modelName of modelsToTry) {
-            try {
-                // Explicitly set apiVersion to 'v1' instead of 'v1beta'
-                const model = genAI.getGenerativeModel(
-                    { model: modelName },
-                    { apiVersion: 'v1' }
-                );
+        console.log(`Llamando a Google API v1 con modelo ${MODEL}...`);
 
-                const propertyContext = (properties || []).map((p: any) =>
-                    `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
-                ).join('\n');
+        const response = await fetch(URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            })
+        });
 
-                const prompt = `
-          Lago Realty Assistant.
-          Properties:
-          ${propertyContext}
-          User: "${userMessage}"
-          Reply concisely in user's language.
-        `;
+        const data = await response.json();
 
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                finalReply = response.text();
+        if (!response.ok) {
+            console.error('Error de Google API:', data);
 
-                if (finalReply) {
-                    console.log(`Success with model: ${modelName} on v1 API`);
-                    break;
-                }
-            } catch (err: any) {
-                console.error(`Model ${modelName} (v1) failed:`, err.message);
-                lastError = err;
-            }
-        }
+            // Si falla la v1, intentamos v1beta como plan B (también por fetch)
+            const URL_BETA = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+            console.log("Reintentando con v1beta...");
 
-        // If v1 fails, try v1beta as a last resort (the default)
-        if (!finalReply) {
-            try {
-                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-                const result = await model.generateContent("Hola");
-                const response = await result.response;
-                finalReply = response.text();
-            } catch (err: any) {
-                lastError = err;
-            }
-        }
-
-        if (!finalReply) {
-            return {
-                statusCode: 500,
+            const retryResponse = await fetch(URL_BETA, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    error: 'Critical: Gemini API rejected all models and versions.',
-                    details: lastError?.message || 'Check API Key permissions at AI Studio.',
-                    hint: 'Verify that the API Key is from "Google AI Studio" and has "Generative Language API" enabled.'
-                }),
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const retryData = await retryResponse.json();
+
+            if (!retryResponse.ok) {
+                return {
+                    statusCode: 500,
+                    body: JSON.stringify({
+                        error: 'Google rechazó la petición en v1 y v1beta.',
+                        details: retryData.error?.message || 'Error desconocido'
+                    }),
+                };
+            }
+
+            return {
+                statusCode: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reply: retryData.candidates[0].content.parts[0].text }),
             };
         }
 
         return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply: finalReply }),
+            body: JSON.stringify({ reply: data.candidates[0].content.parts[0].text }),
         };
+
     } catch (error: any) {
+        console.error('Error interno:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Server error', details: error.message }),
+            body: JSON.stringify({ error: 'Error interno del servidor', details: error.message }),
         };
     }
 };
