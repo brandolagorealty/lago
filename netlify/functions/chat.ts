@@ -15,30 +15,43 @@ export const handler = async (event: any) => {
             };
         }
 
+        // Construimos un contexto mucho más rico para la IA
+        const baseUrl = 'https://lagorealty.com.ve';
         const propertyContext = (properties || []).map((p: any) =>
-            `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
+            `- [${p.title}] (${p.type}): $${p.price}, ${p.beds} hab, ${p.baths} baños en ${p.location}. Enlace: ${baseUrl}/property/${p.id}`
         ).join('\n');
 
-        const prompt = `
-      Eres el asistente de Lago Realty. Ayuda al usuario a encontrar propiedades.
-      Propiedades disponibles:
+        const systemInstructions = `
+      Eres el Asistente Premium de Lago Realty, una inmobiliaria de élite en Zulia, Venezuela.
+      Tu objetivo es ser un vendedor experto y servicial.
+      
+      REGLAS DE ORO:
+      1. Si el usuario busca algo, muestra el enlace directo usando el formato: [Nombre de Propiedad](${baseUrl}/property/[id]).
+      2. Siempre pregunta si el usuario prefiere COMPRAR o ALQUILAR si no lo ha especificado.
+      3. Si el usuario muestra interés real, ofrécele agendar una cita o visita guiada.
+      4. Mantén un tono profesional, elegante y cercano.
+      5. Responde brevemente (máximo 4 frases).
+      6. Solo usa la información de las propiedades proporcionadas abajo. 
+      7. Si no hay una propiedad que encaje exactamente, ofrece la más parecida y menciona que puedes buscar más opciones.
+
+      PROPIEDADES DISPONIBLES:
       ${propertyContext}
-      Usuario: "${userMessage}"
-      Responde de forma breve y amable en español.
     `;
 
-        // Usamos los nombres exactos que salieron en TU lista de diagnóstico y que confirmaste que funcionan
+        const prompt = `
+      Usuario dice: "${userMessage}"
+    `;
+
+        // Modelos confirmados para tu cuenta
         const modelsToTry = [
             'gemini-3-flash-preview',
             'gemini-flash-latest',
-            'gemini-pro-latest',
-            'gemini-2.0-flash-lite'
+            'gemini-pro-latest'
         ];
 
         let lastErrorDetails = "";
 
         for (const modelName of modelsToTry) {
-            console.log(`Intentando ${modelName}...`);
             const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
 
             try {
@@ -46,7 +59,12 @@ export const handler = async (event: any) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
+                        system_instruction: {
+                            parts: [{ text: systemInstructions }]
+                        },
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }]
                     })
                 });
 
@@ -60,10 +78,6 @@ export const handler = async (event: any) => {
                     };
                 } else {
                     lastErrorDetails += `[${modelName}]: ${data.error?.message || 'Error'}. `;
-                    // Si es cuota excedida en este modelo, probamos el siguiente
-                    if (data.error?.message?.toLowerCase().includes('quota')) {
-                        continue;
-                    }
                 }
             } catch (err: any) {
                 lastErrorDetails += `[${modelName}] error: ${err.message}. `;
@@ -73,9 +87,8 @@ export const handler = async (event: any) => {
         return {
             statusCode: 500,
             body: JSON.stringify({
-                error: "No se pudo conectar con ningún modelo de Gemini disponible.",
-                details: lastErrorDetails,
-                hint: 'Tu cuenta parece tener acceso a modelos experimentales (Gemini 3). Verifica que la llave en Netlify sea la correcta.'
+                error: "Error al procesar la inteligencia del chat.",
+                details: lastErrorDetails
             }),
         };
 
