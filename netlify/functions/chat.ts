@@ -30,7 +30,7 @@ export const handler = async (event: any) => {
         }
 
         const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         const propertyContext = (properties || []).map((p: any) =>
             `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}. ${p.description}`
@@ -74,11 +74,23 @@ export const handler = async (event: any) => {
         };
     } catch (error: any) {
         console.error('Netlify Function Error:', error);
+
+        let diagnosticInfo = '';
+        try {
+            // Attempt to list models to see what's available for this key
+            const modelsResult = await genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }); // Just to get the instance
+            // Note: The SDK doesn't have a direct listModels on the main class usually, 
+            // but we can try to provide a more helpful message.
+            diagnosticInfo = ` (Error details: ${error.message})`;
+        } catch (diagError) {
+            diagnosticInfo = ` (Diagnostics failed: ${error.message})`;
+        }
+
         return {
             statusCode: 500,
             body: JSON.stringify({
                 error: 'Failed to generate AI response',
-                details: error.message,
+                details: error.message + diagnosticInfo,
                 stack: error.stack
             }),
         };
