@@ -7,11 +7,15 @@ export const handler = async (event: any) => {
     try {
         const { userMessage, properties, chatHistory } = JSON.parse(event.body);
         const API_KEY = process.env.VITE_GEMINI_API_KEY;
+        const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+        const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+        const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+        const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Falta la API Key en Netlify o entorno local.' }),
+                body: JSON.stringify({ error: 'Falta la API Key en Netlify.' }),
             };
         }
 
@@ -39,55 +43,95 @@ export const handler = async (event: any) => {
       REGLAS CRÍTICAS:
       - Sé 100% NEUTRAL en género. No uses "Bienvenido/a".
       - No repitas preguntas si ya tienes los datos.
-      - Usa enlaces cortos solo si son relevantes.
 
-      PROPIEDADES DISPONIBLES:
-      ${propertyContext}
+      Si detectas que el usuario ya dio su Nombre, Teléfono y Correo, confirma con entusiasmo que un agente le contactará.
     `;
-
-        const historyContext = (chatHistory || []).map((m: any) =>
-            `${m.role === 'user' ? 'Usuario' : 'LaGuia'}: ${m.text}`
-        ).join('\n');
 
         const prompt = `
       Historial:
-      ${historyContext}
+      ${(chatHistory || []).map((m: any) => `${m.role === 'user' ? 'Usuario' : 'LaGuia'}: ${m.text}`).join('\n')}
       
       Mensaje actual del Usuario: "${userMessage}"
       
       Respuesta de LaGuia:
     `;
 
-        const modelsToTry = ['gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-pro-latest'];
-        let lastErrorDetails = "";
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system_instruction: { parts: [{ text: systemInstructions }] },
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    response_mime_type: "application/json",
+                    response_schema: {
+                        type: "object",
+                        properties: {
+                            reply: { type: "string" },
+                            leadInfo: {
+                                type: "object",
+                                properties: {
+                                    name: { type: "string" },
+                                    phone: { type: "string" },
+                                    email: { type: "string" },
+                                    intent: { type: "string" }
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+        });
 
-        for (const modelName of modelsToTry) {
-            const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+        const data = await response.json();
+        const result = JSON.parse(data.candidates[0].content.parts[0].text);
+        const { reply, leadInfo } = result;
+
+        // Si tenemos datos de lead, intentamos guardarlos
+        if (leadInfo && leadInfo.name && leadInfo.phone && leadInfo.email && SUPABASE_URL && SUPABASE_KEY) {
             try {
-                const response = await fetch(URL, {
+                // Guardar en Supabase
+                await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'return=minimal'
+                    },
                     body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemInstructions }] },
-                        contents: [{ parts: [{ text: prompt }] }]
+                        name: leadInfo.name,
+                        phone: leadInfo.phone,
+                        email: leadInfo.email,
+                        intent: leadInfo.intent || 'No especificado',
+                        chat_summary: chatHistory.map((m: any) => m.text).join('\n')
                     })
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    return {
-                        statusCode: 200,
+
+                // Notificar por Telegram si está configurado
+                if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+                    const message = `🔔 *¡Nuevo Lead Capturado!*\n\n👤 *Nombre:* ${leadInfo.name}\n📞 *Teléfono:* ${leadInfo.phone}\n📧 *Email:* ${leadInfo.email}\n🏠 *Intención:* ${leadInfo.intent || 'Desconocida'}\n\n✨ *LaGuia* ha hecho su trabajo.`;
+                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ reply: data.candidates[0].content.parts[0].text }),
-                    };
-                } else {
-                    lastErrorDetails += `[${modelName}]: ${data.error?.message || 'Error'}. `;
+                        body: JSON.stringify({
+                            chat_id: TELEGRAM_CHAT_ID,
+                            text: message,
+                            parse_mode: 'Markdown'
+                        })
+                    });
                 }
-            } catch (err: any) {
-                lastErrorDetails += `[${modelName}] error: ${err.message}. `;
+            } catch (err) {
+                console.error('Error al procesar lead:', err);
             }
         }
 
-        return { statusCode: 500, body: JSON.stringify({ error: "Error de IA", details: lastErrorDetails }) };
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reply }),
+        };
+
     } catch (error: any) {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }

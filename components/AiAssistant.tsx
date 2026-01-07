@@ -44,6 +44,39 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
     setIsLoading(false);
   };
 
+  // Simple markdown-like formatter for bold and links
+  const renderMessage = (text: string) => {
+    // Replace **bold** with <strong>
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    // Replace [label](url) with <a>
+    const linkRegex = /\[(.*?)\]\((.*?)\)/g;
+
+    let formattedText = text;
+
+    // Split text into parts to handle bolding and links safely without dangerouslySetInnerHTML if possible, 
+    // but for simplicity and common practice in such chat components:
+    return text.split('\n').map((line, i) => (
+      <p key={i} className="mb-2 last:mb-0">
+        {line.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\))/g).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={j} className="font-bold">{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('[') && part.includes('](')) {
+            const match = part.match(/\[(.*?)\]\((.*?)\)/);
+            if (match) {
+              return (
+                <a key={j} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-blue-200 underline hover:text-white transition-colors">
+                  {match[1]}
+                </a>
+              );
+            }
+          }
+          return part;
+        })}
+      </p>
+    ));
+  };
+
   return (
     <div className="fixed bottom-8 right-8 z-[100]">
       <button
@@ -82,8 +115,11 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
           <div ref={scrollRef} className="flex-grow p-4 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none shadow-lg' : 'bg-white text-slate-800 rounded-bl-none shadow-sm'}`}>
-                  {msg.text}
+                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-br-none shadow-lg'
+                    : 'bg-white text-slate-800 rounded-bl-none shadow-sm'
+                  }`}>
+                  {renderMessage(msg.text)}
                 </div>
               </div>
             ))}
