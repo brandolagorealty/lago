@@ -11,14 +11,15 @@ export const getAiResponse = async (userMessage: string, properties: Property[])
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch AI response');
+      const errorText = await response.text();
+      console.error(`AI Assistant Error (${response.status}):`, errorText);
+      return `Lo siento, el servicio respondió con un error (${response.status}). Por favor, intenta de nuevo más tarde o reporta este error.`;
     }
 
     const data = await response.json();
     return data.reply;
   } catch (error: any) {
-    console.error('Chat Error:', error);
-    return "I'm having trouble connecting to my service right now. Please try again later.";
+    console.error('Chat Connection Error:', error);
+    return "No pude conectar con el asistente de Lago. Por favor, verifica tu conexión a internet o intenta de nuevo en unos minutos.";
   }
 };
