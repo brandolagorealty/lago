@@ -15,8 +15,6 @@ export const handler = async (event: any) => {
             };
         }
 
-        const keyHint = `(Key: ...${API_KEY.slice(-4)})`;
-
         const propertyContext = (properties || []).map((p: any) =>
             `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
         ).join('\n');
@@ -29,21 +27,18 @@ export const handler = async (event: any) => {
       Responde de forma breve y amable en español.
     `;
 
-        // Basado en el último error:
-        // 1. v1 NO encuentra los modelos (da 404).
-        // 2. gemini-2.0-flash tiene CUOTA 0 (bloqueado por Google para tu cuenta).
-        // 3. Vamos a usar v1beta con los modelos 1.5 que son los más estables.
+        // Usamos los nombres exactos que salieron en TU lista de diagnóstico y que confirmaste que funcionan
         const modelsToTry = [
-            'gemini-1.5-flash',
-            'gemini-1.5-flash-latest',
-            'gemini-1.5-pro'
+            'gemini-3-flash-preview',
+            'gemini-flash-latest',
+            'gemini-pro-latest',
+            'gemini-2.0-flash-lite'
         ];
 
         let lastErrorDetails = "";
 
         for (const modelName of modelsToTry) {
-            console.log(`Intentando ${modelName} en v1beta...`);
-            // Forzamos v1beta para todos porque v1 está fallando en tu región/cuenta
+            console.log(`Intentando ${modelName}...`);
             const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
 
             try {
@@ -65,22 +60,22 @@ export const handler = async (event: any) => {
                     };
                 } else {
                     lastErrorDetails += `[${modelName}]: ${data.error?.message || 'Error'}. `;
-                    // Si es un error de cuota o de llave filtrada, no seguimos intentando
-                    if (data.error?.message?.toLowerCase().includes('quota') || data.error?.message?.toLowerCase().includes('leaked')) {
-                        break;
+                    // Si es cuota excedida en este modelo, probamos el siguiente
+                    if (data.error?.message?.toLowerCase().includes('quota')) {
+                        continue;
                     }
                 }
             } catch (err: any) {
-                lastErrorDetails += `[${modelName}] red error: ${err.message}. `;
+                lastErrorDetails += `[${modelName}] error: ${err.message}. `;
             }
         }
 
         return {
             statusCode: 500,
             body: JSON.stringify({
-                error: `Error de Google API ${keyHint}.`,
+                error: "No se pudo conectar con ningún modelo de Gemini disponible.",
                 details: lastErrorDetails,
-                hint: 'Google dice que no tienes cuota (limit: 0). Esto ocurre a veces con cuentas nuevas de Google Cloud. Verifica en Google AI Studio si puedes chatear ahí directamente con el modelo 1.5 Flash.'
+                hint: 'Tu cuenta parece tener acceso a modelos experimentales (Gemini 3). Verifica que la llave en Netlify sea la correcta.'
             }),
         };
 
