@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Property } from '../types';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const API_KEY = (import.meta as any).env.VITE_GEMINI_API_KEY || '';
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -12,7 +12,7 @@ export const getAiResponse = async (userMessage: string, properties: Property[])
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const propertyContext = properties.map(p =>
       `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}. ${p.description}`
@@ -47,8 +47,8 @@ export const getAiResponse = async (userMessage: string, properties: Property[])
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
-  } catch (error) {
-    console.error('Error generating AI response:', error);
-    return "I'm having trouble connecting to my service right now. Please try again later.";
+  } catch (error: any) {
+    console.error('Gemini API Error:', error);
+    return "I'm having trouble connecting to my service right now. This might be due to regional restrictions or connection issues. Please try again later.";
   }
 };
