@@ -15,8 +15,7 @@ export const handler = async (event: any) => {
             };
         }
 
-        // Pista segura para que el usuario verifique si Netlify tomó la llave nueva
-        const keyHint = `(Termina en: ...${API_KEY.slice(-4)})`;
+        const keyHint = `(Key: ...${API_KEY.slice(-4)})`;
 
         const propertyContext = (properties || []).map((p: any) =>
             `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}.`
@@ -30,18 +29,22 @@ export const handler = async (event: any) => {
       Responde de forma breve y amable en español.
     `;
 
-        // Intentamos los modelos que vimos en TU lista de diagnóstico
+        // Basado en el último error:
+        // 1. v1 NO encuentra los modelos (da 404).
+        // 2. gemini-2.0-flash tiene CUOTA 0 (bloqueado por Google para tu cuenta).
+        // 3. Vamos a usar v1beta con los modelos 1.5 que son los más estables.
         const modelsToTry = [
-            { name: 'gemini-2.0-flash', version: 'v1beta' },
-            { name: 'gemini-flash-latest', version: 'v1' },
-            { name: 'gemini-pro-latest', version: 'v1' }
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro'
         ];
 
         let lastErrorDetails = "";
 
-        for (const m of modelsToTry) {
-            console.log(`Intentando ${m.name} en ${m.version}...`);
-            const URL = `https://generativelanguage.googleapis.com/${m.version}/models/${m.name}:generateContent?key=${API_KEY}`;
+        for (const modelName of modelsToTry) {
+            console.log(`Intentando ${modelName} en v1beta...`);
+            // Forzamos v1beta para todos porque v1 está fallando en tu región/cuenta
+            const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
 
             try {
                 const response = await fetch(URL, {
@@ -61,23 +64,23 @@ export const handler = async (event: any) => {
                         body: JSON.stringify({ reply: data.candidates[0].content.parts[0].text }),
                     };
                 } else {
-                    lastErrorDetails += `[${m.name} ${m.version}]: ${data.error?.message || 'Error'}. `;
-                    // Si el error dice "leaked", rompemos el ciclo porque la llave está muerta
-                    if (data.error?.message?.toLowerCase().includes('leaked')) {
+                    lastErrorDetails += `[${modelName}]: ${data.error?.message || 'Error'}. `;
+                    // Si es un error de cuota o de llave filtrada, no seguimos intentando
+                    if (data.error?.message?.toLowerCase().includes('quota') || data.error?.message?.toLowerCase().includes('leaked')) {
                         break;
                     }
                 }
             } catch (err: any) {
-                lastErrorDetails += `[${m.name}] Error de red: ${err.message}. `;
+                lastErrorDetails += `[${modelName}] red error: ${err.message}. `;
             }
         }
 
         return {
             statusCode: 500,
             body: JSON.stringify({
-                error: `Error de configuración en Google API. ${keyHint}`,
+                error: `Error de Google API ${keyHint}.`,
                 details: lastErrorDetails,
-                hint: 'Si ves el mensaje "leaked", es que Netlify aún está usando tu llave vieja. Asegúrate de haber guardado la nueva y haber hecho un "Clear cache and deploy site".'
+                hint: 'Google dice que no tienes cuota (limit: 0). Esto ocurre a veces con cuentas nuevas de Google Cloud. Verifica en Google AI Studio si puedes chatear ahí directamente con el modelo 1.5 Flash.'
             }),
         };
 
