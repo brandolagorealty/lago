@@ -2,7 +2,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const handler = async (event: any) => {
-    // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -22,77 +21,64 @@ export const handler = async (event: any) => {
         const API_KEY = process.env.VITE_GEMINI_API_KEY;
 
         if (!API_KEY) {
-            console.error('SERVER ERROR: VITE_GEMINI_API_KEY is missing');
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'API Key not configured on server. Please check Netlify environment variables.' }),
+                body: JSON.stringify({ error: 'API Key not configured on Netlify.' }),
             };
         }
 
         const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-        const propertyContext = (properties || []).map((p: any) =>
-            `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}. ${p.description}`
-        ).join('\n');
+        // Fallback strategy for models
+        const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
+        let lastError = null;
+        let finalReply = null;
 
-        const prompt = `
-      You are the AI assistant for Lago Realty, a premium real estate agency in Zulia, Venezuela.
-      
-      Your Role:
-      - Act as a knowledgeable, professional, and friendly real estate agent.
-      - Help users find properties from the list provided below.
-      - Answer questions about the real estate market in Zulia (Maracaibo, Cabimas, Ciudad Ojeda, etc.).
-      - If the user asks about a specific location not in the list (like Miami or Caracas), politely explain you only specialize in Zulia.
-      
-      Context - Available Properties:
-      ${propertyContext}
-      
-      Context - Company Info:
-      - Name: Lago Realty
-      - Focus: Luxury and commercial real estate in Zulia, Venezuela.
-      - Mission: Redefining real estate experience through integrity.
-      
-      User Message: "${userMessage}"
-      
-      Response Guidelines:
-      - Keep responses concise (under 3 sentences unless asked for details).
-      - If the user speaks Spanish, reply in Spanish. If English, reply in English.
-      - Always recommend specific properties from the list if they match the user's criteria.
-      - Be helpful and encouraging.
-    `;
+        for (const modelName of modelsToTry) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
+                const propertyContext = (properties || []).map((p: any) =>
+                    `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}. ${p.description}`
+                ).join('\n');
 
-        return {
-            statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ reply: response.text() }),
-        };
-    } catch (error: any) {
-        console.error('Netlify Function Error:', error);
+                const prompt = `
+          You are the AI assistant for Lago Realty, a real estate agency in Zulia, Venezuela.
+          Context - Available Properties:
+          ${propertyContext}
+          User Message: "${userMessage}"
+          Reply in the user's language. Keep it under 3 sentences.
+        `;
 
-        let diagnosticInfo = '';
-        try {
-            // Attempt to list models to see what's available for this key
-            const modelsResult = await genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }); // Just to get the instance
-            // Note: The SDK doesn't have a direct listModels on the main class usually, 
-            // but we can try to provide a more helpful message.
-            diagnosticInfo = ` (Error details: ${error.message})`;
-        } catch (diagError) {
-            diagnosticInfo = ` (Diagnostics failed: ${error.message})`;
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                finalReply = response.text();
+                if (finalReply) break;
+            } catch (err: any) {
+                console.error(`Model ${modelName} failed:`, err.message);
+                lastError = err;
+            }
+        }
+
+        if (!finalReply) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({
+                    error: 'All models failed',
+                    details: lastError?.message || 'Unknown error'
+                }),
+            };
         }
 
         return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reply: finalReply }),
+        };
+    } catch (error: any) {
+        return {
             statusCode: 500,
-            body: JSON.stringify({
-                error: 'Failed to generate AI response',
-                details: error.message + diagnosticInfo,
-                stack: error.stack
-            }),
+            body: JSON.stringify({ error: 'Server error', details: error.message }),
         };
     }
 };
