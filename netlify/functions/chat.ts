@@ -27,62 +27,64 @@ export const handler = async (event: any) => {
       Responde de forma breve y amable en español.
     `;
 
-        // Intentamos con la API v1 directamente usando fetch para evitar problemas de la librería
-        const MODEL = 'gemini-1.5-flash';
-        const URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
+        // List confirmada por el diagnóstico:
+        const MODEL = 'gemini-flash-latest';
+        const URL_V1 = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
 
-        console.log(`Llamando a Google API v1 con modelo ${MODEL}...`);
+        let lastErrorDetails = "";
 
-        const response = await fetch(URL, {
+        console.log("Intentando API v1...");
+        const responseV1 = await fetch(URL_V1, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
+                contents: [{ parts: [{ text: prompt }] }]
             })
         });
 
-        const data = await response.json();
+        const dataV1 = await responseV1.json();
 
-        if (!response.ok) {
-            console.error('Error de Google API:', data);
-
-            // Si falla la v1, intentamos v1beta como plan B (también por fetch)
-            const URL_BETA = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-            console.log("Reintentando con v1beta...");
-
-            const retryResponse = await fetch(URL_BETA, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
-            });
-
-            const retryData = await retryResponse.json();
-
-            if (!retryResponse.ok) {
-                return {
-                    statusCode: 500,
-                    body: JSON.stringify({
-                        error: 'Google rechazó la petición en v1 y v1beta.',
-                        details: retryData.error?.message || 'Error desconocido'
-                    }),
-                };
-            }
-
+        if (responseV1.ok) {
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reply: retryData.candidates[0].content.parts[0].text }),
+                body: JSON.stringify({ reply: dataV1.candidates[0].content.parts[0].text }),
             };
+        } else {
+            lastErrorDetails += `Version v1: ${dataV1.error?.message || 'Error desconocido'}. `;
         }
 
-        return {
-            statusCode: 200,
+        // Si falla v1, intentamos v1beta
+        console.log("Intentando API v1beta...");
+        const URL_BETA = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+        const responseBeta = await fetch(URL_BETA, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply: data.candidates[0].content.parts[0].text }),
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+
+        const dataBeta = await responseBeta.json();
+
+        if (responseBeta.ok) {
+            return {
+                statusCode: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reply: dataBeta.candidates[0].content.parts[0].text }),
+            };
+        } else {
+            lastErrorDetails += `Version v1beta: ${dataBeta.error?.message || 'Error desconocido'}. `;
+        }
+
+        // Si ambos fallan, devolvemos el reporte detallado
+        return {
+            statusCode: 500,
+            body: JSON.stringify({
+                error: 'Google API rechazó todas las versiones.',
+                details: lastErrorDetails,
+                hint: 'Verifica que tu API Key tenga habilitado el "Generative Language API" en el Google Cloud Console o que sea una llave válida de AI Studio.'
+            }),
         };
 
     } catch (error: any) {
