@@ -11,9 +11,18 @@ export const getAiResponse = async (userMessage: string, properties: Property[])
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`AI Assistant Error (${response.status}):`, errorText);
-      return `Lo siento, el servicio respondió con un error (${response.status}). Por favor, intenta de nuevo más tarde o reporta este error.`;
+      let errorMessage = `Lo siento, el servicio respondió con un error (${response.status}).`;
+      try {
+        const errorData = await response.json();
+        console.error(`Status ${response.status}:`, errorData);
+        if (errorData.details) {
+          errorMessage += ` Detalles: ${errorData.details}`;
+        }
+      } catch (e) {
+        const text = await response.text();
+        console.error(`Status ${response.status}:`, text);
+      }
+      return errorMessage;
     }
 
     const data = await response.json();

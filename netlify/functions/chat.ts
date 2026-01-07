@@ -11,20 +11,28 @@ export const handler = async (event: any) => {
     }
 
     try {
+        if (!event.body) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ error: 'Missing body' }),
+            };
+        }
+
         const { userMessage, properties } = JSON.parse(event.body);
         const API_KEY = process.env.VITE_GEMINI_API_KEY;
 
         if (!API_KEY) {
+            console.error('SERVER ERROR: VITE_GEMINI_API_KEY is missing');
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Gemini API Key not configured on server.' }),
+                body: JSON.stringify({ error: 'API Key not configured on server. Please check Netlify environment variables.' }),
             };
         }
 
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-        const propertyContext = properties.map((p: any) =>
+        const propertyContext = (properties || []).map((p: any) =>
             `- ${p.title} (${p.type}): $${p.price}, ${p.beds} beds, ${p.baths} baths in ${p.location}. ${p.description}`
         ).join('\n');
 
@@ -59,13 +67,20 @@ export const handler = async (event: any) => {
 
         return {
             statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({ reply: response.text() }),
         };
     } catch (error: any) {
         console.error('Netlify Function Error:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Failed to generate AI response' }),
+            body: JSON.stringify({
+                error: 'Failed to generate AI response',
+                details: error.message,
+                stack: error.stack
+            }),
         };
     }
 };
