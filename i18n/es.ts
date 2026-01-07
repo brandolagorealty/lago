@@ -89,8 +89,8 @@ export const es: Translations = {
         clearFilters: 'Borrar filtros',
     },
     ai: {
-        welcome: '¡Hola! Soy el Asistente Lago. ¿Cómo puedo ayudarte a encontrar la propiedad de tus sueños hoy?',
+        welcome: '¡Hola! Soy LaGuia de Lago Realty. ¿Cómo puedo ayudarte a encontrar la propiedad de tus sueños hoy?',
         placeholder: 'Pregunta sobre propiedades, precios o ubicaciones...',
-        title: 'Asistente Lago',
+        title: 'LaGuia',
     },
 };
