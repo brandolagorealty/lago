@@ -5,45 +5,57 @@ export const handler = async (event: any) => {
     }
 
     try {
-        const { userMessage, properties } = JSON.parse(event.body);
+        const { userMessage, properties, chatHistory } = JSON.parse(event.body);
         const API_KEY = process.env.VITE_GEMINI_API_KEY;
 
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Falta la API Key en Netlify.' }),
+                body: JSON.stringify({ error: 'Falta la API Key en Netlify o entorno local.' }),
             };
         }
 
-        // Construimos un contexto mucho más rico para la IA
         const baseUrl = 'https://lagorealty.com.ve';
         const propertyContext = (properties || []).map((p: any) =>
             `- [${p.title}] (${p.type}): $${p.price}, ${p.beds} hab, ${p.baths} baños en ${p.location}. Enlace: ${baseUrl}/property/${p.id}`
         ).join('\n');
 
         const systemInstructions = `
-      Eres "LaGuia", el Asistente Premium de Lago Realty, una inmobiliaria de élite en Zulia, Venezuela.
-      Tu objetivo es ser un guía experto, vendedor carismático y muy servicial.
+      Eres "LaGuia", la asistente de ventas premium de Lago Realty. 
+      Tu objetivo es captar clientes potenciales (Leads) usando la fórmula AIDA de manera sutil y elegante.
+
+      ESTRATEGIA CONVERSACIONAL:
+      1. ATENCIÓN/INTERÉS: Al hablar de propiedades, resalta los beneficios emocionales (estatus, confort, seguridad). Usa frases como "¿Imaginas vivir aquí?" o "Esta es una oportunidad única".
+      2. DESEO: Haz que la propiedad suene irresistible. Si el usuario pregunta por algo, dáselo pero añade un detalle de valor sobre la zona.
+      3. ACCIÓN (Lead Gen): 
+         - PASO 1: Si es la primera interacción o no sabes el nombre, pregunta cordialmente con quién tienes el gusto de hablar.
+         - PASO 2: Pregunta si busca COMPRAR o ALQUILAR (fundamental para el agente).
+         - PASO 3: Una vez tengas el interés, pide número de TELÉFONO y CORREO diciendo: "Para que un experto de nuestro equipo se ponga en contacto contigo y te asesore sin compromiso, ¿podrías compartirme tu número y correo?".
       
       REGLAS DE ORO:
-      1. Preséntate como "LaGuia" si el usuario te pregunta quién eres.
-      1. Si el usuario busca algo, muestra el enlace directo usando el formato: [Nombre de Propiedad](${baseUrl}/property/[id]).
-      2. Siempre pregunta si el usuario prefiere COMPRAR o ALQUILAR si no lo ha especificado.
-      3. Si el usuario muestra interés real, ofrécele agendar una cita o visita guiada.
-      4. Mantén un tono profesional, elegante y cercano.
-      5. Responde brevemente (máximo 4 frases).
-      6. Solo usa la información de las propiedades proporcionadas abajo. 
-      7. Si no hay una propiedad que encaje exactamente, ofrece la más parecida y menciona que puedes buscar más opciones.
+      - Sé 100% NEUTRAL en género. Usa "contigo", "quien nos visita", "tu interés". Nunca asumas si es hombre o mujer.
+      - Después de que te den los datos, confirma que un agente llamará pronto, pero invita a seguir explorando: "Mientras tanto, ¿te gustaría ver más opciones de lujo o algo más económico?".
+      - Usa enlaces de propiedades solo si encajan con la búsqueda.
+      - Responde brevemente (máximo 4-5 frases).
 
       PROPIEDADES DISPONIBLES:
       ${propertyContext}
     `;
 
+        // Incluimos historial para que la IA sepa si ya pidió los datos
+        const historyContext = (chatHistory || []).map((m: any) =>
+            `${m.role === 'user' ? 'Usuario' : 'LaGuia'}: ${m.text}`
+        ).join('\n');
+
         const prompt = `
-      Usuario dice: "${userMessage}"
+      Historial reciente:
+      ${historyContext}
+      
+      Último mensaje del usuario: "${userMessage}"
+      
+      Respuesta de LaGuia:
     `;
 
-        // Modelos confirmados para tu cuenta
         const modelsToTry = [
             'gemini-3-flash-preview',
             'gemini-flash-latest',
@@ -60,12 +72,8 @@ export const handler = async (event: any) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        system_instruction: {
-                            parts: [{ text: systemInstructions }]
-                        },
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }]
+                        system_instruction: { parts: [{ text: systemInstructions }] },
+                        contents: [{ parts: [{ text: prompt }] }]
                     })
                 });
 
@@ -87,17 +95,10 @@ export const handler = async (event: any) => {
 
         return {
             statusCode: 500,
-            body: JSON.stringify({
-                error: "Error al procesar la inteligencia del chat.",
-                details: lastErrorDetails
-            }),
+            body: JSON.stringify({ error: "Error de IA", details: lastErrorDetails }),
         };
 
     } catch (error: any) {
-        console.error('Error interno:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: 'Error interno del servidor', details: error.message }),
-        };
+        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };

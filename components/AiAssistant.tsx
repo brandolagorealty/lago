@@ -35,7 +35,8 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
     setIsLoading(true);
 
     try {
-      const response = await getAiResponse(userMsg, properties);
+      // Pasamos el historial actual para que la IA sepa qué ha preguntado ya
+      const response = await getAiResponse(userMsg, properties, messages);
       setMessages(prev => [...prev, { role: 'ai', text: response }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'ai', text: t.common.error }]);
