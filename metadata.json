@@ -1,0 +1,7 @@
+{
+  "name": "Lago Realty",
+  "description": "A premium real estate platform featuring advanced property searching, AI-powered property assistance, and a professional showcase of mission and vision.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
