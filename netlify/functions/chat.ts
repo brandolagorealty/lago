@@ -56,80 +56,101 @@ export const handler = async (event: any) => {
       Respuesta de LaGuia:
     `;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemInstructions }] },
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    response_mime_type: "application/json",
-                    response_schema: {
-                        type: "object",
-                        properties: {
-                            reply: { type: "string" },
-                            leadInfo: {
+        const modelsToTry = [
+            'gemini-3-flash-preview',
+            'gemini-flash-latest',
+            'gemini-2.0-flash-exp',
+            'gemini-1.5-flash'
+        ];
+
+        let lastError = "";
+
+        for (const modelName of modelsToTry) {
+            try {
+                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+                const response = await fetch(URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: systemInstructions }] },
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            response_mime_type: "application/json",
+                            response_schema: {
                                 type: "object",
                                 properties: {
-                                    name: { type: "string" },
-                                    phone: { type: "string" },
-                                    email: { type: "string" },
-                                    intent: { type: "string" }
-                                }
+                                    reply: { type: "string" },
+                                    leadInfo: {
+                                        type: "object",
+                                        properties: {
+                                            name: { type: "string" },
+                                            phone: { type: "string" },
+                                            email: { type: "string" },
+                                            intent: { type: "string" }
+                                        }
+                                    }
+                                },
+                                required: ["reply"]
                             }
                         }
-                    }
-                }
-            })
-        });
-
-        const data = await response.json();
-        const result = JSON.parse(data.candidates[0].content.parts[0].text);
-        const { reply, leadInfo } = result;
-
-        // Si tenemos datos de lead, intentamos guardarlos
-        if (leadInfo && leadInfo.name && leadInfo.phone && leadInfo.email && SUPABASE_URL && SUPABASE_KEY) {
-            try {
-                // Guardar en Supabase
-                await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`,
-                        'Prefer': 'return=minimal'
-                    },
-                    body: JSON.stringify({
-                        name: leadInfo.name,
-                        phone: leadInfo.phone,
-                        email: leadInfo.email,
-                        intent: leadInfo.intent || 'No especificado',
-                        chat_summary: chatHistory.map((m: any) => m.text).join('\n')
                     })
                 });
 
-                // Notificar por Telegram si está configurado
-                if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-                    const message = `🔔 *¡Nuevo Lead Capturado!*\n\n👤 *Nombre:* ${leadInfo.name}\n📞 *Teléfono:* ${leadInfo.phone}\n📧 *Email:* ${leadInfo.email}\n🏠 *Intención:* ${leadInfo.intent || 'Desconocida'}\n\n✨ *LaGuia* ha hecho su trabajo.`;
-                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                        method: 'POST',
+                const data = await response.json();
+
+                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const result = JSON.parse(data.candidates[0].content.parts[0].text);
+                    const { reply, leadInfo } = result;
+
+                    // Intento de guardar Lead (solo si están los 3 datos principales)
+                    if (leadInfo?.name && leadInfo?.phone && leadInfo?.email && SUPABASE_URL && SUPABASE_KEY) {
+                        try {
+                            await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'apikey': SUPABASE_KEY,
+                                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                                    'Prefer': 'return=minimal'
+                                },
+                                body: JSON.stringify({
+                                    name: leadInfo.name,
+                                    phone: leadInfo.phone,
+                                    email: leadInfo.email,
+                                    intent: leadInfo.intent || 'No especificado',
+                                    chat_summary: (chatHistory || []).map((m: any) => m.text).join('\n')
+                                })
+                            });
+
+                            if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+                                const message = `🔔 *¡Nuevo Lead Capturado!*\n\n👤 *Nombre:* ${leadInfo.name}\n📞 *Teléfono:* ${leadInfo.phone}\n📧 *Email:* ${leadInfo.email}\n🏠 *Intención:* ${leadInfo.intent || 'Desconocida'}\n\n✨ *LaGuia* lo ha logrado.`;
+                                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: 'Markdown' })
+                                });
+                            }
+                        } catch (leadError) {
+                            console.error('Error guardando lead:', leadError);
+                        }
+                    }
+
+                    return {
+                        statusCode: 200,
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: TELEGRAM_CHAT_ID,
-                            text: message,
-                            parse_mode: 'Markdown'
-                        })
-                    });
+                        body: JSON.stringify({ reply }),
+                    };
+                } else {
+                    lastError += `[${modelName}]: ${data.error?.message || 'Error desconocido'}. `;
                 }
-            } catch (err) {
-                console.error('Error al procesar lead:', err);
+            } catch (err: any) {
+                lastError += `[${modelName}]: ${err.message}. `;
             }
         }
 
         return {
-            statusCode: 200,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply }),
+            statusCode: 500,
+            body: JSON.stringify({ error: "Error en LaGuia", details: lastError }),
         };
 
     } catch (error: any) {
