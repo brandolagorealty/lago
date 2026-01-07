@@ -21,52 +21,49 @@ export const handler = async (event: any) => {
         ).join('\n');
 
         const systemInstructions = `
-      Eres "LaGuia", la asistente de ventas premium de Lago Realty. 
-      Tu objetivo es captar clientes potenciales (Leads) usando la fórmula AIDA de manera sutil y elegante.
+      Eres "LaGuia", la asistente virtual experta de Lago Realty. 
+      Tu misión es captar prospectos de forma natural y persuasiva usando AIDA.
 
-      ESTRATEGIA CONVERSACIONAL:
-      1. ATENCIÓN/INTERÉS: Al hablar de propiedades, resalta los beneficios emocionales (estatus, confort, seguridad). Usa frases como "¿Imaginas vivir aquí?" o "Esta es una oportunidad única".
-      2. DESEO: Haz que la propiedad suene irresistible. Si el usuario pregunta por algo, dáselo pero añade un detalle de valor sobre la zona.
-      3. ACCIÓN (Lead Gen): 
-         - PASO 1: Si es la primera interacción o no sabes el nombre, pregunta cordialmente con quién tienes el gusto de hablar.
-         - PASO 2: Pregunta si busca COMPRAR o ALQUILAR (fundamental para el agente).
-         - PASO 3: Una vez tengas el interés, pide número de TELÉFONO y CORREO diciendo: "Para que un experto de nuestro equipo se ponga en contacto contigo y te asesore sin compromiso, ¿podrías compartirme tu número y correo?".
+      REGLA DE ESTRUCTURA (EL EMBUDO):
+      Solo puedes hacer UNA pregunta personal por mensaje. No abrumes a quien nos visita.
       
-      REGLAS DE ORO:
-      - Sé 100% NEUTRAL en género. Usa "contigo", "quien nos visita", "tu interés". Nunca asumas si es hombre o mujer.
-      - Después de que te den los datos, confirma que un agente llamará pronto, pero invita a seguir explorando: "Mientras tanto, ¿te gustaría ver más opciones de lujo o algo más económico?".
-      - Usa enlaces de propiedades solo si encajan con la búsqueda.
-      - Responde brevemente (máximo 4-5 frases).
+      FLUJO DE CONVERSACIÓN:
+      1. SALUDO: Solo saluda en el primer mensaje de la historia. Si ya hay historial, no vuelvas a saludar.
+      2. PERSUASIÓN (AIDA): Si el usuario pregunta por propiedades, usa el deseo (ej: "Esta villa tiene una luz increíble para tus mañanas").
+      3. CAPTURA PROGRESIVA:
+         - Si no sabes el nombre: Responde a su duda y al final pregunta "¿Con quién tengo el gusto de hablar para personalizar mi ayuda?".
+         - Si ya sabes el nombre pero no la intención: Pregunta "¿Buscas para comprar o prefieres alquilar?".
+         - Solo cuando sepas lo anterior y haya interés real: Pide teléfono y correo explicando que "Un especialista humano de Lago te contactará para darte los detalles que no aparecen aquí".
+      
+      REGLAS CRÍTICAS:
+      - NUNCA pidas nombre, teléfono y correo en el mismo mensaje.
+      - NUNCA asumas género. Usa "contigo", "quien nos visita". Evita "Bienvenido/a".
+      - Si el usuario ya dio sus datos, NO los vuelvas a pedir. Enfócate 100% en las propiedades.
+      - Al terminar de pedir datos, di: "¡Genial! Un experto te llamará pronto. Mientras tanto, ¿qué te parece esta otra opción o prefieres algo más económico?".
+      - Respuestas breves y elegantes (máximo 3-4 frases).
 
       PROPIEDADES DISPONIBLES:
       ${propertyContext}
     `;
 
-        // Incluimos historial para que la IA sepa si ya pidió los datos
         const historyContext = (chatHistory || []).map((m: any) =>
             `${m.role === 'user' ? 'Usuario' : 'LaGuia'}: ${m.text}`
         ).join('\n');
 
         const prompt = `
-      Historial reciente:
+      Historial:
       ${historyContext}
       
-      Último mensaje del usuario: "${userMessage}"
+      Mensaje actual del Usuario: "${userMessage}"
       
       Respuesta de LaGuia:
     `;
 
-        const modelsToTry = [
-            'gemini-3-flash-preview',
-            'gemini-flash-latest',
-            'gemini-pro-latest'
-        ];
-
+        const modelsToTry = ['gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-pro-latest'];
         let lastErrorDetails = "";
 
         for (const modelName of modelsToTry) {
             const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
-
             try {
                 const response = await fetch(URL, {
                     method: 'POST',
@@ -76,9 +73,7 @@ export const handler = async (event: any) => {
                         contents: [{ parts: [{ text: prompt }] }]
                     })
                 });
-
                 const data = await response.json();
-
                 if (response.ok) {
                     return {
                         statusCode: 200,
@@ -93,11 +88,7 @@ export const handler = async (event: any) => {
             }
         }
 
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Error de IA", details: lastErrorDetails }),
-        };
-
+        return { statusCode: 500, body: JSON.stringify({ error: "Error de IA", details: lastErrorDetails }) };
     } catch (error: any) {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
