@@ -23,16 +23,24 @@ export const handler = async (event: any) => {
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'API Key not configured on Netlify.' }),
+                body: JSON.stringify({ error: 'API Key not configured on Netlify environment variables.' }),
             };
         }
 
         const genAI = new GoogleGenerativeAI(API_KEY);
 
-        // Fallback strategy for models
-        const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
+        // Comprehensive fallback strategy for model names
+        const modelsToTry = [
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro',
+            'gemini-pro',
+            'gemini-1.0-pro'
+        ];
+
         let lastError = null;
         let finalReply = null;
+        let fallbackLog = [];
 
         for (const modelName of modelsToTry) {
             try {
@@ -53,9 +61,14 @@ export const handler = async (event: any) => {
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
                 finalReply = response.text();
-                if (finalReply) break;
+
+                if (finalReply) {
+                    console.log(`Success using model: ${modelName}`);
+                    break;
+                }
             } catch (err: any) {
-                console.error(`Model ${modelName} failed:`, err.message);
+                console.error(`Attempt with ${modelName} failed:`, err.message);
+                fallbackLog.push(`${modelName}: ${err.message}`);
                 lastError = err;
             }
         }
@@ -64,8 +77,9 @@ export const handler = async (event: any) => {
             return {
                 statusCode: 500,
                 body: JSON.stringify({
-                    error: 'All models failed',
-                    details: lastError?.message || 'Unknown error'
+                    error: 'Todos los modelos de Google (Flash, Pro) fallaron.',
+                    details: lastError?.message || 'Error desconocido',
+                    log: fallbackLog
                 }),
             };
         }
@@ -78,7 +92,7 @@ export const handler = async (event: any) => {
     } catch (error: any) {
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Server error', details: error.message }),
+            body: JSON.stringify({ error: 'Error interno del servidor', details: error.message }),
         };
     }
 };
