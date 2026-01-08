@@ -93,4 +93,31 @@ export const en: Translations = {
         placeholder: 'Ask about properties, prices, or locations...',
         title: 'LaGuia',
     },
+    footer: {
+        description: 'Leaders in the Zulia real estate market, offering the most exclusive properties and world-class service.',
+        quickLinks: 'Quick Links',
+        legal: 'Legal Support',
+        social: 'Social Media',
+        contact: 'Contact',
+        rights: 'All rights reserved.',
+    },
+    support: {
+        privacy: {
+            title: 'Privacy Policy',
+            content: 'At Lago Realty, we value your privacy. This policy details how we handle your personal data with maximum security and transparency.',
+        },
+        terms: {
+            title: 'Terms of Service',
+            content: 'By using our site, you agree to comply with our terms of service designed to ensure a safe and professional experience.',
+        },
+        contact: {
+            title: 'Contact Us',
+            subtitle: 'We are here to advise you on your next investment.',
+            name: 'Full Name',
+            email: 'Email Address',
+            message: 'Message',
+            send: 'Send Message',
+            info: 'Contact Information',
+        },
+    },
 };

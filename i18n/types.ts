@@ -91,4 +91,31 @@ export type Translations = {
         placeholder: string;
         title: string;
     };
+    footer: {
+        description: string;
+        quickLinks: string;
+        legal: string;
+        social: string;
+        contact: string;
+        rights: string;
+    };
+    support: {
+        privacy: {
+            title: string;
+            content: string;
+        };
+        terms: {
+            title: string;
+            content: string;
+        };
+        contact: {
+            title: string;
+            subtitle: string;
+            name: string;
+            email: string;
+            message: string;
+            send: string;
+            info: string;
+        };
+    };
 };

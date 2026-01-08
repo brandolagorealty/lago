@@ -7,6 +7,9 @@ import { LanguageProvider } from './i18n/LanguageContext';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 
 import PropertyDetails from './pages/PropertyDetails';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import Contact from './pages/Contact';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -30,6 +33,9 @@ const App: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/property/:id" element={<PropertyDetails />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/contact" element={<Contact />} />
             <Route
               path="/admin"
               element={

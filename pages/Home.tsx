@@ -5,6 +5,7 @@ import PropertyCard from '../components/PropertyCard';
 import SkeletonCard from '../components/SkeletonCard';
 import AboutSection from '../components/AboutSection';
 import AiAssistant from '../components/AiAssistant';
+import Footer from '../components/Footer';
 import PropertyForm from '../components/PropertyForm';
 import { ViewState, FilterState, Property } from '../types';
 import { propertyService } from '../services/supabase';
@@ -155,8 +156,7 @@ const Home: React.FC = () => {
             </main>
 
             <AiAssistant properties={properties} />
-            {/* PropertyForm removed from public view unless we want a "Request listing" feature. 
-          For now, we remove it as per requirement to only allow admins. */}
+            <Footer />
         </div>
     );
 };

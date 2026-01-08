@@ -93,4 +93,31 @@ export const es: Translations = {
         placeholder: 'Pregunta sobre propiedades, precios o ubicaciones...',
         title: 'LaGuia',
     },
+    footer: {
+        description: 'Líderes en el mercado inmobiliario del Zulia, ofreciendo las propiedades más exclusivas y un servicio de clase mundial.',
+        quickLinks: 'Enlaces Rápidos',
+        legal: 'Soporte Legal',
+        social: 'Redes Sociales',
+        contact: 'Contacto',
+        rights: 'Todos los derechos reservados.',
+    },
+    support: {
+        privacy: {
+            title: 'Política de Privacidad',
+            content: 'En Lago Realty, valoramos tu privacidad. Esta política detalla cómo manejamos tus datos personales con la máxima seguridad y transparencia.',
+        },
+        terms: {
+            title: 'Términos y Condiciones',
+            content: 'Al utilizar nuestro sitio, aceptas cumplir con nuestros términos de servicio diseñados para garantizar una experiencia segura y profesional.',
+        },
+        contact: {
+            title: 'Contáctanos',
+            subtitle: 'Estamos aquí para asesorarte en tu próxima inversión.',
+            name: 'Nombre Completo',
+            email: 'Correo Electrónico',
+            message: 'Mensaje',
+            send: 'Enviar Mensaje',
+            info: 'Información de Contacto',
+        },
+    },
 };
