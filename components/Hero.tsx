@@ -31,7 +31,7 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
         <div className="absolute inset-0 bg-brand-black/40 backdrop-brightness-75"></div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 text-center">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 text-center pt-20 md:pt-0">
         <h1 className="text-4xl md:text-7xl font-serif font-bold text-brand-white mb-6 tracking-tight animate-fade-in whitespace-pre-line">
           {t.hero.title}
         </h1>
