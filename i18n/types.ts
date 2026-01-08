@@ -90,6 +90,21 @@ export type Translations = {
         welcome: string;
         placeholder: string;
         title: string;
+        alwaysAvailable: string;
+    };
+    details: {
+        notFound: string;
+        returnHome: string;
+        priceLabel: string;
+        perMonth: string;
+        description: string;
+        features: string;
+        general: string;
+        interior: string;
+        exterior: string;
+        schedule: string;
+        contactAgent: string;
+        officialAgent: string;
     };
     footer: {
         description: string;

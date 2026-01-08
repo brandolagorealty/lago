@@ -38,9 +38,9 @@ const PropertyDetails: React.FC = () => {
     if (!property) {
         return (
             <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center">
-                <h2 className="text-2xl font-bold text-brand-black mb-4">Property Not Found</h2>
+                <h2 className="text-2xl font-bold text-brand-black mb-4">{t.details.notFound}</h2>
                 <button onClick={() => navigate('/')} className="text-brand-green hover:underline font-bold">
-                    Return Home
+                    {t.details.returnHome}
                 </button>
             </div>
         );
@@ -52,7 +52,7 @@ const PropertyDetails: React.FC = () => {
             currency: 'USD',
             maximumFractionDigits: 0,
         }).format(price);
-        return type === 'rent' ? `${formatted}/mo` : formatted;
+        return type === 'rent' ? `${formatted}${t.details.perMonth}` : formatted;
     };
 
     return (
@@ -112,7 +112,7 @@ const PropertyDetails: React.FC = () => {
 
                         {/* Description */}
                         <div>
-                            <h3 className="text-2xl font-serif font-bold text-brand-black mb-6">Description</h3>
+                            <h3 className="text-2xl font-serif font-bold text-brand-black mb-6">{t.details.description}</h3>
                             <div className="prose prose-lg text-brand-black/80 whitespace-pre-line">
                                 {property.description}
                             </div>
@@ -121,11 +121,11 @@ const PropertyDetails: React.FC = () => {
                         {/* Features */}
                         {property.features && (
                             <div>
-                                <h3 className="text-2xl font-serif font-bold text-brand-black mb-6">Features & Amenities</h3>
+                                <h3 className="text-2xl font-serif font-bold text-brand-black mb-6">{t.details.features}</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {property.features.general?.length > 0 && (
                                         <div>
-                                            <h4 className="font-bold text-brand-green uppercase tracking-widest text-sm mb-4">General</h4>
+                                            <h4 className="font-bold text-brand-green uppercase tracking-widest text-sm mb-4">{t.details.general}</h4>
                                             <ul className="space-y-2">
                                                 {property.features.general.map((f, i) => (
                                                     <li key={i} className="flex items-center text-brand-black/80">
@@ -138,7 +138,7 @@ const PropertyDetails: React.FC = () => {
                                     )}
                                     {property.features.interior?.length > 0 && (
                                         <div>
-                                            <h4 className="font-bold text-brand-green uppercase tracking-widest text-sm mb-4">Interior</h4>
+                                            <h4 className="font-bold text-brand-green uppercase tracking-widest text-sm mb-4">{t.details.interior}</h4>
                                             <ul className="space-y-2">
                                                 {property.features.interior.map((f, i) => (
                                                     <li key={i} className="flex items-center text-brand-black/80">
@@ -151,7 +151,7 @@ const PropertyDetails: React.FC = () => {
                                     )}
                                     {property.features.exterior?.length > 0 && (
                                         <div>
-                                            <h4 className="font-bold text-brand-green uppercase tracking-widest text-sm mb-4">Exterior</h4>
+                                            <h4 className="font-bold text-brand-green uppercase tracking-widest text-sm mb-4">{t.details.exterior}</h4>
                                             <ul className="space-y-2">
                                                 {property.features.exterior.map((f, i) => (
                                                     <li key={i} className="flex items-center text-brand-black/80">
@@ -171,15 +171,15 @@ const PropertyDetails: React.FC = () => {
                     <div className="lg:col-span-1">
                         <div className="bg-white p-8 rounded-2xl shadow-xl border border-brand-black/5 sticky top-24">
                             <div className="mb-8">
-                                <span className="block text-lg text-brand-black/60 mb-1">Price</span>
+                                <span className="block text-lg text-brand-black/60 mb-1">{t.details.priceLabel}</span>
                                 <span className="block text-4xl font-bold text-brand-green">{formatPrice(property.price, property.listingType)}</span>
                             </div>
 
                             <button className="w-full bg-brand-green text-white font-bold py-4 rounded-xl mb-4 hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20">
-                                Schedule Viewing
+                                {t.details.schedule}
                             </button>
                             <button className="w-full bg-white border-2 border-brand-black/10 text-brand-black font-bold py-4 rounded-xl hover:bg-brand-black hover:text-white transition-colors">
-                                Contact Agent
+                                {t.details.contactAgent}
                             </button>
 
                             <div className="mt-8 pt-8 border-t border-brand-black/10 flex items-center">
@@ -188,7 +188,7 @@ const PropertyDetails: React.FC = () => {
                                 </div>
                                 <div>
                                     <span className="block font-bold text-brand-black">Lago Realty</span>
-                                    <span className="text-sm text-brand-black/60">Official Listing Agent</span>
+                                    <span className="text-sm text-brand-black/60">{t.details.officialAgent}</span>
                                 </div>
                             </div>
                         </div>

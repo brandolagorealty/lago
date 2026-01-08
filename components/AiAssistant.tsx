@@ -81,7 +81,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
     <div className="fixed bottom-8 right-8 z-[100]">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 hover:scale-110 active:scale-95 transition-all group"
+        className="w-16 h-16 bg-brand-green text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-brand-green/90 hover:scale-110 active:scale-95 transition-all group"
       >
         {isOpen ? (
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,8 +93,8 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-blue opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-blue"></span>
             </span>
           </div>
         )}
@@ -107,7 +107,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
               <h3 className="font-bold text-lg">{t.ai.title}</h3>
               <p className="text-xs text-slate-400 flex items-center">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                Always available
+                {t.ai.alwaysAvailable}
               </p>
             </div>
           </div>
@@ -116,8 +116,8 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none shadow-lg'
-                    : 'bg-white text-slate-800 rounded-bl-none shadow-sm'
+                  ? 'bg-brand-green text-white rounded-br-none shadow-lg'
+                  : 'bg-white text-slate-800 rounded-bl-none shadow-sm'
                   }`}>
                   {renderMessage(msg.text)}
                 </div>
@@ -135,10 +135,10 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
           </div>
 
           <div className="p-4 border-t border-slate-100 bg-white">
-            <div className="flex items-center bg-slate-100 rounded-2xl p-2 focus-within:ring-2 ring-blue-500/20 transition-all">
+            <div className="flex items-center bg-slate-100 rounded-2xl p-2 focus-within:ring-2 ring-brand-green/20 transition-all">
               <input type="text" placeholder={t.ai.placeholder} className="flex-grow bg-transparent px-3 text-sm focus:outline-none text-slate-800"
                 value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} />
-              <button onClick={handleSendMessage} disabled={!inputValue.trim() || isLoading} className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              <button onClick={handleSendMessage} disabled={!inputValue.trim() || isLoading} className="p-2 bg-brand-green text-white rounded-xl hover:bg-brand-green/90 disabled:opacity-50 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
