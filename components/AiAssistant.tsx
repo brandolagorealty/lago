@@ -8,7 +8,7 @@ interface AiAssistantProps {
 }
 
 const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -36,7 +36,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ properties }) => {
 
     try {
       // Pasamos el historial actual para que la IA sepa qué ha preguntado ya
-      const response = await getAiResponse(userMsg, properties, messages);
+      const response = await getAiResponse(userMsg, properties, messages, language);
       setMessages(prev => [...prev, { role: 'ai', text: response }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'ai', text: t.common.error }]);

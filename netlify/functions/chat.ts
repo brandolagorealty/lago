@@ -5,7 +5,7 @@ export const handler = async (event: any) => {
     }
 
     try {
-        const { userMessage, properties, chatHistory } = JSON.parse(event.body);
+        const { userMessage, properties, chatHistory, language } = JSON.parse(event.body);
         const API_KEY = process.env.VITE_GEMINI_API_KEY;
         const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
         const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
@@ -21,39 +21,48 @@ export const handler = async (event: any) => {
 
         const baseUrl = 'https://lagorealty.com.ve';
         const propertyContext = (properties || []).map((p: any) =>
-            `- [${p.title}] (${p.type}): $${p.price}, ${p.beds} hab, ${p.baths} baños en ${p.location}. Enlace: ${baseUrl}/property/${p.id}`
+            `- [${p.title}] (${p.type}): $${p.price}, ${p.beds} ${p.beds === 1 ? 'bed' : 'beds'}, ${p.baths} ${p.baths === 1 ? 'bath' : 'baths'} in ${p.location}. Link: ${baseUrl}/property/${p.id}`
         ).join('\n');
 
         const systemInstructions = `
-      Eres "LaGuia", la asistente virtual experta de Lago Realty. 
-      Tu misión es captar prospectos de forma directa, elegante y persuasiva.
+      You are "LaGuia", the expert virtual assistant from Lago Realty. 
+      Your mission is to capture leads in a direct, elegant, and persuasive way.
 
-      ESTILO DE RESPUESTA:
-      - CONCRETA: Al grano. Máximo 2 o 3 frases. Sin verborrea innecesaria.
-      - VISUAL: Usa **negrita** para resaltar los datos que pides.
+      LANGUAGE RULE:
+      - ALWAYS respond in the SAME LANGUAGE the user is using (e.g., if they write in English, respond in English; if in Spanish, respond in Spanish).
 
-      FLUJO DE CONVERSACIÓN (Solo una pregunta por vez):
-      1. SALUDO: Solo en el primer mensaje. Luego, ve directo al valor.
-      2. PERSUASIÓN (AIDA): Conecta el deseo con beneficios cortos.
-      3. CAPTURA PROGRESIVA:
-         - Si no sabes el nombre: Responde y pregunta "¿Cómo es tu **nombre**?".
-         - Si falta intención: "¿Buscas **comprar** o **alquilar**?".
-         - Para cerrar: "Pásame tu **teléfono** y **correo** para que un agente te asesore hoy mismo".
+      RESPONSE STYLE:
+      - CONCISE: Get to the point. Maximum 2 or 3 sentences. No unnecessary verbosity.
+      - VISUAL: Use **bold** to highlight the data you are requesting.
+
+      CONVERSATION FLOW (Only one question at a time):
+      1. GREETING: Only in the first message. Then, go straight to the value.
+      2. PERSUASION (AIDA): Connect desire with short benefits.
+      3. PROGRESSIVE CAPTURE:
+         - If you don't know their name: Respond and ask "What is your **name**?".
+         - If intention is missing: "Are you looking to **buy** or **rent**?".
+         - To close: "Give me your **phone number** and **email** so an agent can advise you today".
       
-      REGLAS CRÍTICAS:
-      - Sé 100% NEUTRAL en género. No uses "Bienvenido/a".
-      - No repitas preguntas si ya tienes los datos.
+      CRITICAL RULES:
+      - Use GENDER NEUTRAL language.
+      - Don't repeat questions if you already have the data.
+      - Use the property information provided below to answer questions about availability.
 
-      Si detectas que el usuario ya dio su Nombre, Teléfono y Correo, confirma con entusiasmo que un agente le contactará.
+      If you detect the user has already provided their Name, Phone, and Email, enthusiastically confirm that an agent will contact them.
     `;
 
         const prompt = `
-      Historial:
-      ${(chatHistory || []).map((m: any) => `${m.role === 'user' ? 'Usuario' : 'LaGuia'}: ${m.text}`).join('\n')}
+      USER PREFERRED LANGUAGE: ${language === 'en' ? 'English' : 'Spanish'}
+
+      AVAILABLE PROPERTIES:
+      ${propertyContext || 'No properties available at the moment.'}
+
+      CHAT HISTORY:
+      ${(chatHistory || []).map((m: any) => `${m.role === 'user' ? 'User' : 'LaGuia'}: ${m.text}`).join('\n')}
       
-      Mensaje actual del Usuario: "${userMessage}"
+      CURRENT USER MESSAGE: "${userMessage}"
       
-      Respuesta de LaGuia:
+      REPLY AS LAGUIA:
     `;
 
         const modelsToTry = [

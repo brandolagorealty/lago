@@ -1,13 +1,13 @@
 import { Property } from '../types';
 
-export const getAiResponse = async (userMessage: string, properties: Property[], chatHistory: any[] = []) => {
+export const getAiResponse = async (userMessage: string, properties: Property[], chatHistory: any[] = [], language: string = 'es') => {
   try {
     const response = await fetch('/.netlify/functions/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userMessage, properties, chatHistory }),
+      body: JSON.stringify({ userMessage, properties, chatHistory, language }),
     });
 
     if (!response.ok) {
