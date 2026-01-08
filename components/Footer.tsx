@@ -18,7 +18,7 @@ const Footer: React.FC = () => {
                     {/* Brand Info */}
                     <div className="space-y-6">
                         <Link to="/" className="flex items-center">
-                            <img src="/logo.png" alt="Lago Realty" className="h-16 w-auto brightness-0 invert" />
+                            <img src="/assets/logo2.png" alt="Lago Realty" className="h-16 w-auto" />
                         </Link>
                         <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
                             {t.footer.description}
