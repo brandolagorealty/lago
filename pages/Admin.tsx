@@ -62,22 +62,22 @@ const Admin: React.FC = () => {
     };
 
     const updatePropertyStatus = async (id: string, status: PropertyStatus) => {
-        const success = await propertyService.updateProperty(id, { status });
-        if (success) {
+        const result = await propertyService.updateProperty(id, { status });
+        if (result.success) {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p));
             setToast({ message: 'Estatus actualizado correctamente', type: 'success' });
         } else {
-            setToast({ message: 'Error al actualizar estatus', type: 'error' });
+            setToast({ message: `Error: ${result.error || 'No se pudo actualizar el estatus'}`, type: 'error' });
         }
     };
 
     const updatePropertyAgent = async (id: string, agentId: string) => {
-        const success = await propertyService.updateProperty(id, { agent_id: agentId });
-        if (success) {
+        const result = await propertyService.updateProperty(id, { agent_id: agentId });
+        if (result.success) {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, agentId } : p));
             setToast({ message: 'Agente asignado correctamente', type: 'success' });
         } else {
-            setToast({ message: 'Error al asignar agente', type: 'error' });
+            setToast({ message: `Error: ${result.error || 'No se pudo asignar el agente'}`, type: 'error' });
         }
     };
 
@@ -89,15 +89,15 @@ const Admin: React.FC = () => {
         if (updates.agentNotes !== undefined) dbUpdates.agent_notes = updates.agentNotes;
         if (updates.price) dbUpdates.price = updates.price;
 
-        const success = await propertyService.updateProperty(id, dbUpdates);
-        if (success) {
+        const result = await propertyService.updateProperty(id, dbUpdates);
+        if (result.success) {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
             if (selectedProperty?.id === id) {
                 setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
             }
             setToast({ message: 'Propiedad actualizada con éxito', type: 'success' });
         } else {
-            setToast({ message: 'Error al actualizar la propiedad', type: 'error' });
+            setToast({ message: `Error: ${result.error || 'No se pudo actualizar la propiedad'}`, type: 'error' });
         }
     };
 

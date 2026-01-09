@@ -174,8 +174,8 @@ export const propertyService = {
   },
 
   // Update property status/agent
-  async updateProperty(id: string, updates: Partial<PropertyDB>): Promise<boolean> {
-    if (!supabase) return false;
+  async updateProperty(id: string, updates: Partial<PropertyDB>): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
     const { error } = await supabase
       .from('properties')
       .update(updates)
@@ -183,9 +183,9 @@ export const propertyService = {
 
     if (error) {
       console.error('Error updating property:', error);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
+    return { success: true };
   },
 
   // Upload image to Storage
