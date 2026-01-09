@@ -40,6 +40,11 @@ const Login: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
             <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border border-slate-100">
                 <div className="text-center mb-8">
+                    <img
+                        src="/assets/logo.png"
+                        alt="Elite Estates Panama"
+                        className="h-20 mx-auto mb-6"
+                    />
                     <h2 className="text-3xl font-serif font-bold text-slate-900">Admin Portal</h2>
                     <p className="text-slate-500 mt-2">Sign in to manage properties</p>
                 </div>
