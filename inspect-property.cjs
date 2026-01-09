@@ -25,26 +25,33 @@ try {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     async function inspect() {
-        console.log('Fetching properties...');
+        console.log('Inspecting table schema...');
+        // Supabase doesn't have a direct 'describe table' in the JS client easily, 
+        // but we can try to fetch one row and see the keys, or use a RPC if available.
+        // Alternatively, we can just try to update a dummy row to test permissions.
+
         const { data, error } = await supabase
             .from('properties')
-            .select('id, title, images, features, image_url')
-            .limit(5);
+            .select('*')
+            .limit(1);
 
         if (error) {
-            console.error('❌ Error fetching properties:', error);
+            console.error('❌ Error:', error);
             return;
         }
 
-        console.log(`✅ Found ${data.length} properties.`);
-        data.forEach((p, i) => {
-            console.log(`\nProperty ${i + 1}: ${p.title} (${p.id})`);
-            console.log('  image_url:', p.image_url);
-            console.log('  images (type):', typeof p.images);
-            console.log('  images (value):', JSON.stringify(p.images));
-            console.log('  features (type):', typeof p.features);
-            console.log('  features (value):', JSON.stringify(p.features));
-        });
+        if (data && data.length > 0) {
+            console.log('✅ Columns found in "properties":');
+            console.log(Object.keys(data[0]).join(', '));
+
+            const p = data[0];
+            console.log('\nSample Values:');
+            console.log('  status:', p.status);
+            console.log('  agent_id:', p.agent_id);
+            console.log('  agent_notes:', p.agent_notes);
+        } else {
+            console.log('No data found in properties table.');
+        }
     }
 
     inspect();
