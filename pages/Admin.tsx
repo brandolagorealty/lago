@@ -485,10 +485,10 @@ const Admin: React.FC = () => {
                                                         <div className="max-w-[200px]">
                                                             <p className="font-bold text-slate-900 leading-tight truncate">{property.title}</p>
                                                             <p className="text-xs text-slate-400">{property.location}</p>
-                                                            {property.agentNotes && (
+                                                            {property.agentNotes && property.agentNotes.length > 0 && (
                                                                 <div className="mt-1 flex items-center gap-1 text-[10px] text-brand-green font-bold">
                                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                                                                    <span className="truncate max-w-[150px]">{property.agentNotes}</span>
+                                                                    <span className="truncate max-w-[150px]">{property.agentNotes[0].text}</span>
                                                                 </div>
                                                             )}
                                                         </div>
