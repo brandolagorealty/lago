@@ -37,6 +37,9 @@ export interface PropertyDB {
   features: any; // jsonb
   featured: boolean;
   is_published: boolean;
+  status: string;
+  agent_id?: string;
+  agent_notes?: string;
   created_at?: string;
 }
 
@@ -57,6 +60,9 @@ const mapProperty = (p: PropertyDB): Property => ({
   shortDescription: p.short_description,
   features: p.features || { general: [], interior: [], exterior: [] },
   featured: p.featured,
+  status: (p.status as any) || 'available',
+  agentId: p.agent_id,
+  agentNotes: p.agent_notes,
 });
 
 export const propertyService = {
@@ -123,7 +129,10 @@ export const propertyService = {
       short_description: property.shortDescription,
       features: property.features,
       featured: property.featured,
-      is_published: isPublished // Use the passed parameter
+      is_published: isPublished, // Use the passed parameter
+      status: property.status || 'available',
+      agent_id: property.agentId,
+      agent_notes: property.agentNotes
     };
 
     const { error } = await supabase
@@ -136,6 +145,30 @@ export const propertyService = {
     }
 
     return { success: true };
+  },
+
+  // Get all agents (Mocked for now since table doesn't exist)
+  async getAgents(): Promise<any[]> {
+    return [
+      { id: '1', name: 'Ana Martinez', avatar: 'https://i.pravatar.cc/150?u=ana', role: 'Ventas Luxury', email: 'ana@lagorealty.com' },
+      { id: '2', name: 'Carlos Sosa', avatar: 'https://i.pravatar.cc/150?u=carlos', role: 'Captaciones', email: 'carlos@lagorealty.com' },
+      { id: '3', name: 'Maria Garcia', avatar: 'https://i.pravatar.cc/150?u=maria', role: 'Alquileres', email: 'maria@lagorealty.com' },
+    ];
+  },
+
+  // Update property status/agent
+  async updateProperty(id: string, updates: Partial<PropertyDB>): Promise<boolean> {
+    if (!supabase) return false;
+    const { error } = await supabase
+      .from('properties')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating property:', error);
+      return false;
+    }
+    return true;
   },
 
   // Upload image to Storage

@@ -9,6 +9,16 @@ export interface PropertyFeatures {
   exterior: string[];
 }
 
+export type PropertyStatus = 'available' | 'sold' | 'rented' | 'reserved';
+
+export interface Agent {
+  id: string;
+  name: string;
+  avatar: string;
+  role: string;
+  email: string;
+}
+
 export interface Property {
   id: string;
   title: string;
@@ -25,6 +35,9 @@ export interface Property {
   shortDescription?: string; // Short summary for cards
   features?: PropertyFeatures; // Grouped features
   featured: boolean;
+  status: PropertyStatus;
+  agentId?: string;
+  agentNotes?: string;
 }
 
 export interface FilterState {

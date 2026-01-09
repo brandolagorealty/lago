@@ -24,10 +24,22 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
     shortDescription: '',
     features: { general: [], interior: [], exterior: [] } as { general: string[], interior: string[], exterior: string[] },
     image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800',
-    images: [] as string[]
+    images: [] as string[],
+    status: 'available' as any,
+    agentId: '',
+    agentNotes: ''
   });
+  const [agents, setAgents] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  React.useEffect(() => {
+    const fetchAgents = async () => {
+      const data = await propertyService.getAgents();
+      setAgents(data);
+    };
+    fetchAgents();
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'main' | 'gallery') => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -89,7 +101,10 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
       shortDescription: formData.shortDescription,
       features: formData.features,
       images: formData.images, // Add gallery
-      featured: false
+      featured: false,
+      status: formData.status,
+      agentId: formData.agentId || undefined,
+      agentNotes: formData.agentNotes
     };
     await onSave(newProperty);
     setIsSubmitting(false);
@@ -245,6 +260,46 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
                 value={formData.features.exterior.join(', ')}
                 onChange={(e) => setFormData({ ...formData, features: { ...formData.features, exterior: e.target.value.split(',').map(s => s.trim()) } })}
               />
+            </div>
+          </div>
+
+          {/* CRM Details - Agent, Status & Notes */}
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Asignar Agente</label>
+              <select
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20"
+                value={formData.agentId}
+                onChange={e => setFormData({ ...formData, agentId: e.target.value })}
+              >
+                <option value="">Seleccionar Agente...</option>
+                {agents.map(agent => (
+                  <option key={agent.id} value={agent.id}>{agent.name} ({agent.role})</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Estatus de Propiedad</label>
+              <select
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20"
+                value={formData.status}
+                onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+              >
+                <option value="available">Disponible</option>
+                <option value="reserved">Reservada</option>
+                <option value="sold">Vendida</option>
+                <option value="rented">Alquilada</option>
+              </select>
+            </div>
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Notas del Agente (Interno)</label>
+              <textarea
+                rows={2}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20 resize-none"
+                placeholder="Observaciones sobre la captación o el estatus..."
+                value={formData.agentNotes}
+                onChange={e => setFormData({ ...formData, agentNotes: e.target.value })}
+              ></textarea>
             </div>
           </div>
 

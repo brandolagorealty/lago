@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PropertyForm from '../components/PropertyForm';
-import { Property } from '../types';
+import { Property, Agent, PropertyStatus } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,30 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
     const [showForm, setShowForm] = useState(false);
+    const [activeTab, setActiveTab] = useState<'inventory' | 'team'>('inventory');
+    const [properties, setProperties] = useState<Property[]>([]);
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [agentFilter, setAgentFilter] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setIsLoading(true);
+        try {
+            const [propsData, agentsData] = await Promise.all([
+                propertyService.getPublishedProperties(), // We might want a getAdminProperties later to see unpublished ones
+                propertyService.getAgents()
+            ]);
+            setProperties(propsData);
+            setAgents(agentsData);
+        } catch (error) {
+            console.error('Error fetching admin data:', error);
+        }
+        setIsLoading(false);
+    };
 
     const handleLogout = async () => {
         await signOut();
@@ -18,59 +42,305 @@ const Admin: React.FC = () => {
     };
 
     const handleSaveProperty = async (property: Property) => {
-        // Admin properties are published immediately (is_published: true)
         const { id, ...propertyData } = property;
         const result = await propertyService.createProperty(propertyData, true);
-
         if (result.success) {
-            alert('Property published successfully!');
+            fetchData();
             setShowForm(false);
         } else {
-            alert('Error publishing property: ' + result.error?.message);
+            alert('Error: ' + result.error?.message);
         }
     };
 
+    const updatePropertyStatus = async (id: string, status: PropertyStatus) => {
+        const success = await propertyService.updateProperty(id, { status });
+        if (success) {
+            setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+        }
+    };
+
+    const updatePropertyAgent = async (id: string, agentId: string) => {
+        const success = await propertyService.updateProperty(id, { agent_id: agentId });
+        if (success) {
+            setProperties(prev => prev.map(p => p.id === id ? { ...p, agentId } : p));
+        }
+    };
+
+    const filteredProperties = useMemo(() => {
+        if (!agentFilter) return properties;
+        return properties.filter(p => p.agentId === agentFilter);
+    }, [properties, agentFilter]);
+
+    const statsByAgent = useMemo(() => {
+        return agents.map(agent => {
+            const agentProps = properties.filter(p => p.agentId === agent.id);
+            const totalValue = agentProps.reduce((sum, p) => sum + p.price, 0);
+            const soldCount = agentProps.filter(p => p.status === 'sold' || p.status === 'rented').length;
+            const availableCount = agentProps.filter(p => p.status === 'available').length;
+            return {
+                ...agent,
+                totalProps: agentProps.length,
+                totalValue,
+                soldCount,
+                availableCount
+            };
+        });
+    }, [agents, properties]);
+
+    const formatCurrency = (val: number) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+    };
+
+    const StatusBadge = ({ status }: { status: PropertyStatus }) => {
+        const colors = {
+            available: 'bg-green-100 text-green-700 border-green-200',
+            sold: 'bg-slate-100 text-slate-700 border-slate-200',
+            rented: 'bg-blue-100 text-blue-700 border-blue-200',
+            reserved: 'bg-amber-100 text-amber-700 border-amber-200',
+        };
+        const labels = {
+            available: 'Disponible',
+            sold: 'Vendida',
+            rented: 'Alquilada',
+            reserved: 'Reservada',
+        };
+        return (
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${colors[status]}`}>
+                {labels[status]}
+            </span>
+        );
+    };
+
     return (
-        <div className="min-h-screen bg-slate-50">
-            <nav className="bg-white border-b border-slate-200 px-6 py-2 flex justify-between items-center">
+        <div className="min-h-screen bg-slate-50 flex flex-col">
+            <nav className="bg-white border-b border-slate-200 px-6 py-2 flex justify-between items-center sticky top-0 z-40">
                 <div className="flex items-center gap-3">
-                    <img
-                        src="/assets/logo.png"
-                        alt="Lago Realty"
-                        className="h-16 w-auto object-contain"
-                    />
-                    <span className="text-xl font-bold text-blue-600">Admin</span>
+                    <img src="/assets/logo.png" alt="Lago Realty" className="h-14 w-auto object-contain" />
+                    <div className="h-8 w-[1px] bg-slate-200"></div>
+                    <span className="text-lg font-bold text-slate-900">CRM Master</span>
                 </div>
-                <div className="flex items-center gap-4">
-                    <span className="text-sm text-slate-500">{user?.email}</span>
-                    <button onClick={handleLogout} className="text-sm font-bold text-red-600 hover:text-red-700">
-                        Sign Out
-                    </button>
+                <div className="flex items-center gap-6">
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <button
+                            onClick={() => setActiveTab('inventory')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'inventory' ? 'bg-white shadow-sm text-brand-green' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Inventario Global
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('team')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-green' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Equipo de Ventas
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-4 border-l border-slate-200 pl-6">
+                        <span className="text-sm text-slate-500 hidden md:inline">{user?.email}</span>
+                        <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Cerrar Sesión">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        </button>
+                    </div>
                 </div>
             </nav>
 
-            <div className="max-w-7xl mx-auto px-6 py-12">
-                <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-3xl font-serif font-bold text-slate-900">Dashboard</h2>
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30"
-                    >
-                        + Add New Property
-                    </button>
-                </div>
+            <main className="flex-grow max-w-7xl w-full mx-auto px-6 py-8">
+                {activeTab === 'inventory' ? (
+                    <div className="space-y-6">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-3xl font-serif font-bold text-slate-900">Inventario Global</h1>
+                                <p className="text-slate-500">Supervisión técnica de activos y asignaciones.</p>
+                            </div>
+                            <div className="flex gap-3">
+                                {agentFilter && (
+                                    <button
+                                        onClick={() => setAgentFilter(null)}
+                                        className="px-4 py-2 rounded-xl bg-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-300 transition-colors"
+                                    >
+                                        Limpiar Filtro
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setShowForm(true)}
+                                    className="bg-brand-green text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20"
+                                >
+                                    + Nueva Propiedad
+                                </button>
+                            </div>
+                        </div>
 
-                {/* Empty state or list could go here */}
-                <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm">
-                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Propiedad</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Estatus</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Precio</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Agente Asignado</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {isLoading ? (
+                                            Array(5).fill(0).map((_, i) => (
+                                                <tr key={i} className="animate-pulse">
+                                                    <td colSpan={5} className="px-6 py-8"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
+                                                </tr>
+                                            ))
+                                        ) : filteredProperties.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No se encontraron propiedades.</td>
+                                            </tr>
+                                        ) : filteredProperties.map(property => (
+                                            <tr key={property.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <img src={property.image} className="w-12 h-12 rounded-lg object-cover" />
+                                                        <div className="max-w-[200px]">
+                                                            <p className="font-bold text-slate-900 leading-tight truncate">{property.title}</p>
+                                                            <p className="text-xs text-slate-400">{property.location}</p>
+                                                            {property.agentNotes && (
+                                                                <div className="mt-1 flex items-center gap-1 text-[10px] text-brand-green font-bold">
+                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                                                    <span className="truncate max-w-[150px]">{property.agentNotes}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <select
+                                                        className="bg-transparent border-none text-xs focus:ring-0 cursor-pointer p-0"
+                                                        value={property.status}
+                                                        onChange={(e) => updatePropertyStatus(property.id, e.target.value as PropertyStatus)}
+                                                    >
+                                                        <option value="available">Disponible</option>
+                                                        <option value="reserved">Reservada</option>
+                                                        <option value="sold">Vendida</option>
+                                                        <option value="rented">Alquilada</option>
+                                                    </select>
+                                                    <div className="mt-1"><StatusBadge status={property.status} /></div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="font-bold text-slate-700">{formatCurrency(property.price)}</p>
+                                                    <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{property.listingType === 'sale' ? 'Venta' : 'Alquiler'}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        {property.agentId ? (
+                                                            <div
+                                                                className="flex items-center gap-2 group cursor-pointer"
+                                                                onClick={() => setAgentFilter(property.agentId!)}
+                                                            >
+                                                                <img
+                                                                    src={agents.find(a => a.id === property.agentId)?.avatar}
+                                                                    className="w-8 h-8 rounded-full border border-white shadow-sm transition-transform group-hover:scale-110"
+                                                                />
+                                                                <select
+                                                                    className="bg-transparent border-none text-xs font-bold text-slate-600 focus:ring-0 cursor-pointer p-0"
+                                                                    value={property.agentId}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    onChange={(e) => updatePropertyAgent(property.id, e.target.value)}
+                                                                >
+                                                                    {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                                                </select>
+                                                            </div>
+                                                        ) : (
+                                                            <select
+                                                                className="bg-slate-100 text-[10px] font-bold text-slate-500 rounded-lg px-2 py-1 outline-none border-none focus:ring-0"
+                                                                onChange={(e) => updatePropertyAgent(property.id, e.target.value)}
+                                                            >
+                                                                <option value="">Sin Asignar</option>
+                                                                {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                                            </select>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button className="p-2 text-slate-400 hover:text-brand-green transition-colors">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">Welcome Back</h3>
-                    <p className="text-slate-500">Manage your real estate listings from this secure portal.</p>
-                </div>
-            </div>
+                ) : (
+                    <div className="space-y-8">
+                        <div>
+                            <h1 className="text-3xl font-serif font-bold text-slate-900">Equipo de Ventas</h1>
+                            <p className="text-slate-500">Métricas de rendimiento y salud de la cartera por agente.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {statsByAgent.map(agent => (
+                                <div key={agent.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="relative">
+                                            <img src={agent.avatar} className="w-16 h-16 rounded-2xl object-cover shadow-lg" />
+                                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-4 border-white rounded-full"></div>
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-slate-900">{agent.name}</h3>
+                                            <p className="text-xs text-brand-green font-bold uppercase tracking-wider">{agent.role}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 mb-6">
+                                        <div className="bg-slate-50 p-4 rounded-2xl">
+                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Valor Cartera</p>
+                                            <p className="font-bold text-slate-900 truncate">{formatCurrency(agent.totalValue)}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-4 rounded-2xl">
+                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Propiedades</p>
+                                            <p className="font-bold text-slate-900">{agent.totalProps}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold mb-2">
+                                                <span className="text-slate-500">Tasa de Cierre</span>
+                                                <span className="text-brand-green">{agent.totalProps > 0 ? Math.round((agent.soldCount / agent.totalProps) * 100) : 0}%</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-brand-green transition-all duration-1000"
+                                                    style={{ width: `${agent.totalProps > 0 ? (agent.soldCount / agent.totalProps) * 100 : 0}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[11px] font-bold">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                                <span className="text-slate-600">{agent.availableCount} Disponibles</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                                                <span className="text-slate-600">{agent.soldCount} Cerradas</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            setAgentFilter(agent.id);
+                                            setActiveTab('inventory');
+                                        }}
+                                        className="w-full mt-6 py-3 rounded-xl border border-slate-100 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Ver Cartera en Inventario
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </main>
 
             {showForm && (
                 <PropertyForm
