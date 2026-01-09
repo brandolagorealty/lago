@@ -37,11 +37,17 @@ const PropertyDetails: React.FC = () => {
 
     if (!property) {
         return (
-            <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center">
-                <h2 className="text-2xl font-bold text-brand-black mb-4">{t.details.notFound}</h2>
-                <button onClick={() => navigate('/')} className="text-brand-green hover:underline font-bold">
-                    {t.details.returnHome}
-                </button>
+            <div className="min-h-screen bg-slate-50 flex flex-col animate-fade-in">
+                <Navbar />
+                <main className="flex-grow pt-24 md:pt-32 pb-20 px-4 md:px-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Back button */}
+                        <h2 className="text-2xl font-bold text-brand-black mb-4">{t.details.notFound}</h2>
+                        <button onClick={() => navigate('/')} className="text-brand-green hover:underline font-bold">
+                            {t.details.returnHome}
+                        </button>
+                    </div>
+                </main>
             </div>
         );
     }

@@ -25,7 +25,7 @@ const Admin: React.FC = () => {
         setIsLoading(true);
         try {
             const [propsData, agentsData] = await Promise.all([
-                propertyService.getPublishedProperties(), // We might want a getAdminProperties later to see unpublished ones
+                propertyService.getAdminProperties(),
                 propertyService.getAgents()
             ]);
             setProperties(propsData);
@@ -45,7 +45,7 @@ const Admin: React.FC = () => {
         const { id, ...propertyData } = property;
         const result = await propertyService.createProperty(propertyData, true);
         if (result.success) {
-            fetchData();
+            await fetchData();
             setShowForm(false);
         } else {
             alert('Error: ' + result.error?.message);
@@ -77,12 +77,20 @@ const Admin: React.FC = () => {
             const totalValue = agentProps.reduce((sum, p) => sum + p.price, 0);
             const soldCount = agentProps.filter(p => p.status === 'sold' || p.status === 'rented').length;
             const availableCount = agentProps.filter(p => p.status === 'available').length;
+
+            // Monthly sales simulation (for the chart)
+            const monthlySales = Array.from({ length: 6 }, (_, i) => ({
+                month: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'][i],
+                sales: Math.floor(Math.random() * (agentProps.length + 1))
+            }));
+
             return {
                 ...agent,
                 totalProps: agentProps.length,
                 totalValue,
                 soldCount,
-                availableCount
+                availableCount,
+                monthlySales
             };
         });
     }, [agents, properties]);
@@ -111,8 +119,29 @@ const Admin: React.FC = () => {
         );
     };
 
+    const PerformanceChart = ({ data }: { data: { month: string, sales: number }[] }) => {
+        const maxSales = Math.max(...data.map(d => d.sales), 1);
+        return (
+            <div className="flex items-end justify-between h-24 gap-1 mt-4">
+                {data.map((d, i) => (
+                    <div key={i} className="flex flex-col items-center flex-1 group">
+                        <div
+                            className="w-full bg-brand-green/20 group-hover:bg-brand-green transition-all rounded-t-sm relative"
+                            style={{ height: `${(d.sales / maxSales) * 100}%` }}
+                        >
+                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {d.sales} ventas
+                            </div>
+                        </div>
+                        <span className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{d.month}</span>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className="min-h-screen bg-slate-50 flex flex-col animate-in fade-in duration-500">
             <nav className="bg-white border-b border-slate-200 px-6 py-2 flex justify-between items-center sticky top-0 z-40">
                 <div className="flex items-center gap-3">
                     <img src="/assets/logo.png" alt="Lago Realty" className="h-14 w-auto object-contain" />
@@ -123,13 +152,13 @@ const Admin: React.FC = () => {
                     <div className="flex bg-slate-100 p-1 rounded-xl">
                         <button
                             onClick={() => setActiveTab('inventory')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'inventory' ? 'bg-white shadow-sm text-brand-green' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'inventory' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Inventario Global
                         </button>
                         <button
                             onClick={() => setActiveTab('team')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-green' : 'text-slate-500 hover:text-slate-700'}`}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Equipo de Ventas
                         </button>
@@ -145,7 +174,7 @@ const Admin: React.FC = () => {
 
             <main className="flex-grow max-w-7xl w-full mx-auto px-6 py-8">
                 {activeTab === 'inventory' ? (
-                    <div className="space-y-6">
+                    <div className="space-y-6 animate-fade-in">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <h1 className="text-3xl font-serif font-bold text-slate-900">Inventario Global</h1>
@@ -169,8 +198,8 @@ const Admin: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto">
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
+                            <div className="overflow-x-auto custom-scrollbar">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 border-b border-slate-200">
                                         <tr>
@@ -193,10 +222,10 @@ const Admin: React.FC = () => {
                                                 <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No se encontraron propiedades.</td>
                                             </tr>
                                         ) : filteredProperties.map(property => (
-                                            <tr key={property.id} className="hover:bg-slate-50 transition-colors">
+                                            <tr key={property.id} className="hover:bg-slate-50/80 transition-colors group">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <img src={property.image} className="w-12 h-12 rounded-lg object-cover" />
+                                                        <img src={property.image} className="w-12 h-12 rounded-lg object-cover shadow-sm group-hover:scale-105 transition-transform" />
                                                         <div className="max-w-[200px]">
                                                             <p className="font-bold text-slate-900 leading-tight truncate">{property.title}</p>
                                                             <p className="text-xs text-slate-400">{property.location}</p>
@@ -211,7 +240,7 @@ const Admin: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <select
-                                                        className="bg-transparent border-none text-xs focus:ring-0 cursor-pointer p-0"
+                                                        className="bg-transparent border-none text-[10px] uppercase font-bold text-slate-500 focus:ring-0 cursor-pointer p-0 mb-1 block"
                                                         value={property.status}
                                                         onChange={(e) => updatePropertyStatus(property.id, e.target.value as PropertyStatus)}
                                                     >
@@ -220,7 +249,7 @@ const Admin: React.FC = () => {
                                                         <option value="sold">Vendida</option>
                                                         <option value="rented">Alquilada</option>
                                                     </select>
-                                                    <div className="mt-1"><StatusBadge status={property.status} /></div>
+                                                    <StatusBadge status={property.status} />
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <p className="font-bold text-slate-700">{formatCurrency(property.price)}</p>
@@ -230,12 +259,12 @@ const Admin: React.FC = () => {
                                                     <div className="flex items-center gap-2">
                                                         {property.agentId ? (
                                                             <div
-                                                                className="flex items-center gap-2 group cursor-pointer"
+                                                                className="flex items-center gap-2 group/agent cursor-pointer"
                                                                 onClick={() => setAgentFilter(property.agentId!)}
                                                             >
                                                                 <img
                                                                     src={agents.find(a => a.id === property.agentId)?.avatar}
-                                                                    className="w-8 h-8 rounded-full border border-white shadow-sm transition-transform group-hover:scale-110"
+                                                                    className="w-8 h-8 rounded-full border border-white shadow-sm transition-transform group-hover/agent:scale-110"
                                                                 />
                                                                 <select
                                                                     className="bg-transparent border-none text-xs font-bold text-slate-600 focus:ring-0 cursor-pointer p-0"
@@ -258,7 +287,7 @@ const Admin: React.FC = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <button className="p-2 text-slate-400 hover:text-brand-green transition-colors">
+                                                    <button className="p-2 text-slate-400 hover:text-brand-green transition-colors hover:bg-white rounded-full">
                                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                     </button>
                                                 </td>
@@ -270,7 +299,7 @@ const Admin: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-8">
+                    <div className="space-y-8 animate-fade-in">
                         <div>
                             <h1 className="text-3xl font-serif font-bold text-slate-900">Equipo de Ventas</h1>
                             <p className="text-slate-500">Métricas de rendimiento y salud de la cartera por agente.</p>
@@ -304,23 +333,29 @@ const Admin: React.FC = () => {
                                     <div className="space-y-4">
                                         <div>
                                             <div className="flex justify-between text-xs font-bold mb-2">
-                                                <span className="text-slate-500">Tasa de Cierre</span>
+                                                <span className="text-slate-500 text-[10px] uppercase">Tasa de Cierre</span>
                                                 <span className="text-brand-green">{agent.totalProps > 0 ? Math.round((agent.soldCount / agent.totalProps) * 100) : 0}%</span>
                                             </div>
                                             <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                                                 <div
-                                                    className="h-full bg-brand-green transition-all duration-1000"
+                                                    className="h-full bg-brand-green transition-all duration-1000 shadow-[0_0_10px_rgba(30,195,129,0.3)]"
                                                     style={{ width: `${agent.totalProps > 0 ? (agent.soldCount / agent.totalProps) * 100 : 0}%` }}
                                                 ></div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between text-[11px] font-bold">
+
+                                        <div className="border-t border-slate-50 pt-4">
+                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Ventas vs Tiempo</p>
+                                            <PerformanceChart data={agent.monthlySales} />
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-[11px] font-bold bg-slate-50 p-3 rounded-xl">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                                <span className="text-slate-600">{agent.availableCount} Disponibles</span>
+                                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                                <span className="text-slate-600">{agent.availableCount} Libres</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                                                <div className="w-2 h-2 rounded-full bg-slate-300"></div>
                                                 <span className="text-slate-600">{agent.soldCount} Cerradas</span>
                                             </div>
                                         </div>
@@ -331,7 +366,7 @@ const Admin: React.FC = () => {
                                             setAgentFilter(agent.id);
                                             setActiveTab('inventory');
                                         }}
-                                        className="w-full mt-6 py-3 rounded-xl border border-slate-100 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                        className="w-full mt-6 py-3 rounded-xl border border-slate-100 text-sm font-bold text-slate-600 hover:bg-brand-green hover:text-white hover:border-brand-green transition-all active:scale-[0.98]"
                                     >
                                         Ver Cartera en Inventario
                                     </button>

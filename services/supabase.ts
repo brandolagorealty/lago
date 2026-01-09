@@ -87,6 +87,23 @@ export const propertyService = {
     return (data as PropertyDB[]).map(mapProperty);
   },
 
+  // Get all properties (for Admin)
+  async getAdminProperties(): Promise<Property[]> {
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching all properties:', error);
+      return [];
+    }
+
+    return (data as PropertyDB[]).map(mapProperty);
+  },
+
   // Get single property by ID
   async getPropertyById(id: string): Promise<Property | null> {
     if (!supabase) return null;
