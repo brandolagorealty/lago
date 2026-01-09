@@ -67,7 +67,7 @@ const Admin: React.FC = () => {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p));
             setToast({ message: 'Estatus actualizado correctamente', type: 'success' });
         } else {
-            setToast({ message: `Error: ${result.error || 'No se pudo actualizar el estatus'}`, type: 'error' });
+            setToast({ message: 'Error al actualizar el estatus', type: 'error' });
         }
     };
 
@@ -77,7 +77,7 @@ const Admin: React.FC = () => {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, agentId } : p));
             setToast({ message: 'Agente asignado correctamente', type: 'success' });
         } else {
-            setToast({ message: `Error: ${result.error || 'No se pudo asignar el agente'}`, type: 'error' });
+            setToast({ message: 'Error al asignar el agente', type: 'error' });
         }
     };
 
@@ -97,7 +97,7 @@ const Admin: React.FC = () => {
             }
             setToast({ message: 'Propiedad actualizada con éxito', type: 'success' });
         } else {
-            setToast({ message: `Error: ${result.error || 'No se pudo actualizar la propiedad'}`, type: 'error' });
+            setToast({ message: 'Error al actualizar la propiedad', type: 'error' });
         }
     };
 
