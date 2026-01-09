@@ -39,7 +39,7 @@ export interface PropertyDB {
   is_published: boolean;
   status: string;
   agent_id?: string;
-  agent_notes?: string;
+  agent_notes?: any; // Changed from string to any for JSONB
   created_at?: string;
 }
 
@@ -62,7 +62,7 @@ const mapProperty = (p: PropertyDB): Property => ({
   featured: p.featured,
   status: (p.status as any) || 'available',
   agentId: p.agent_id,
-  agentNotes: p.agent_notes,
+  agentNotes: Array.isArray(p.agent_notes) ? p.agent_notes : [], // Handle JSONB array
 });
 
 export const propertyService = {

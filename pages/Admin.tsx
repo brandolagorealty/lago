@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import PropertyForm from '../components/PropertyForm';
-import { Property, Agent, PropertyStatus } from '../types';
+import { Property, Agent, PropertyStatus, PropertyNote } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
@@ -176,13 +176,53 @@ const Admin: React.FC = () => {
     };
 
     const PropertyDetailModal = ({ property, onClose, onUpdate }: { property: Property, onClose: () => void, onUpdate: (id: string, updates: Partial<Property>) => Promise<void> }) => {
-        const [notes, setNotes] = useState(property.agentNotes || '');
+        const [newNote, setNewNote] = useState('');
+        const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+        const [editValue, setEditValue] = useState('');
         const [isSaving, setIsSaving] = useState(false);
 
-        const handleSaveNotes = async () => {
+        const handleAddNote = async () => {
+            if (!newNote.trim()) return;
             setIsSaving(true);
-            await onUpdate(property.id, { agentNotes: notes });
+            const note: PropertyNote = {
+                id: Math.random().toString(36).substring(2, 9),
+                text: newNote,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            const updatedNotes = [note, ...(property.agentNotes || [])];
+            await onUpdate(property.id, { agentNotes: updatedNotes });
+            setNewNote('');
             setIsSaving(false);
+        };
+
+        const handleUpdateNote = async (id: string) => {
+            if (!editValue.trim()) return;
+            setIsSaving(true);
+            const updatedNotes = (property.agentNotes || []).map(n =>
+                n.id === id ? { ...n, text: editValue, updatedAt: new Date().toISOString() } : n
+            );
+            await onUpdate(property.id, { agentNotes: updatedNotes });
+            setEditingNoteId(null);
+            setIsSaving(false);
+        };
+
+        const handleDeleteNote = async (id: string) => {
+            if (!confirm('¿Estás seguro de que deseas eliminar esta nota?')) return;
+            setIsSaving(true);
+            const updatedNotes = (property.agentNotes || []).filter(n => n.id !== id);
+            await onUpdate(property.id, { agentNotes: updatedNotes });
+            setIsSaving(false);
+        };
+
+        const formatNoteDate = (isoDate: string) => {
+            const date = new Date(isoDate);
+            const now = new Date();
+            const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
+
+            if (diffDays === 0) return `Hoy ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+            if (diffDays === 1) return `Ayer ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
         };
 
         return (
@@ -256,26 +296,88 @@ const Admin: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                                Notas de Seguimiento
-                                {property.agentNotes !== notes && (
-                                    <span className="text-[10px] text-brand-green animate-pulse">Sin guardar</span>
-                                )}
+                        <div className="space-y-4 flex flex-col h-[400px]">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between sticky top-0 bg-white py-2 z-10">
+                                Línea de Tiempo de Notas
+                                <span className="text-[10px] text-brand-green font-bold">{(property.agentNotes || []).length} observaciones</span>
                             </h3>
-                            <textarea
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Escribe aquí las observaciones internas sobre esta propiedad..."
-                                className="w-full h-48 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-brand-green/10 focus:border-brand-green/30 transition-all resize-none"
-                            ></textarea>
-                            <button
-                                onClick={handleSaveNotes}
-                                disabled={isSaving || property.agentNotes === notes}
-                                className="w-full py-3 bg-brand-green text-white rounded-xl font-bold text-sm shadow-lg shadow-brand-green/20 hover:bg-brand-green/90 transition-all disabled:opacity-50 disabled:shadow-none"
-                            >
-                                {isSaving ? 'Guardando...' : 'Guardar Observaciones'}
-                            </button>
+
+                            {/* Timeline Container */}
+                            <div className="flex-grow overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+                                {(property.agentNotes || []).length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50 space-y-2">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                        <p className="text-[10px] font-bold uppercase tracking-tighter">Sin notas de seguimiento</p>
+                                    </div>
+                                ) : (
+                                    (property.agentNotes || []).map((note) => (
+                                        <div key={note.id} className="relative pl-6 border-l-2 border-slate-100 group">
+                                            <div className="absolute -left-[7px] top-1 w-3 h-3 rounded-full bg-slate-200 group-hover:bg-brand-green group-hover:scale-125 transition-all"></div>
+                                            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow group/note">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-[10px] font-bold text-brand-green uppercase tracking-tighter">
+                                                        {formatNoteDate(note.createdAt)}
+                                                        {note.updatedAt !== note.createdAt && <span className="ml-2 text-slate-400">(Editado)</span>}
+                                                    </span>
+                                                    <div className="flex gap-2 opacity-0 group-hover/note:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingNoteId(note.id);
+                                                                setEditValue(note.text);
+                                                            }}
+                                                            className="text-slate-400 hover:text-brand-green transition-colors"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteNote(note.id)}
+                                                            className="text-slate-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {editingNoteId === note.id ? (
+                                                    <div className="space-y-2">
+                                                        <textarea
+                                                            value={editValue}
+                                                            onChange={(e) => setEditValue(e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-brand-green/20"
+                                                            autoFocus
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => setEditingNoteId(null)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Cancelar</button>
+                                                            <button onClick={() => handleUpdateNote(note.id)} className="text-[10px] font-bold text-brand-green hover:text-brand-green/80">Guardar</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-slate-600 font-medium whitespace-pre-wrap">{note.text}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* New Note Input */}
+                            <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newNote}
+                                    onChange={(e) => setNewNote(e.target.value)}
+                                    placeholder="Nueva observación..."
+                                    className="flex-grow bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green/20 transition-all font-medium"
+                                    onKeyPress={(e) => e.key === 'Enter' && handleAddNote()}
+                                />
+                                <button
+                                    onClick={handleAddNote}
+                                    disabled={isSaving || !newNote.trim()}
+                                    className="bg-brand-green text-white p-2 rounded-xl hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 disabled:opacity-50"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

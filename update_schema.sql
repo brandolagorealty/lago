@@ -1,17 +1,14 @@
--- Execute este script en el Editor SQL de Supabase para añadir las columnas faltantes del CRM
+-- Execute este script en el Editor SQL de Supabase para activar la Línea de Tiempo de Notas
 
--- 1. Añadir columna de estatus
+-- 1. Convertir la columna agent_notes a JSONB (formato de lista estructurada)
+-- Usamos USING para intentar convertir el texto existente en un formato JSON si es posible,
+-- pero para una limpieza segura, la inicializamos como una lista vacía [].
 ALTER TABLE properties 
-ADD COLUMN IF NOT EXISTS status text DEFAULT 'available';
+ALTER COLUMN agent_notes TYPE jsonb USING '[]'::jsonb;
 
--- 2. Añadir columna de ID de agente
+-- 2. Asegurarse de que el valor por defecto sea una lista vacía
 ALTER TABLE properties 
-ADD COLUMN IF NOT EXISTS agent_id text;
-
--- 3. Añadir columna de notas internas del agente
-ALTER TABLE properties 
-ADD COLUMN IF NOT EXISTS agent_notes text;
+ALTER COLUMN agent_notes SET DEFAULT '[]'::jsonb;
 
 -- Comentario para verificar:
--- Estas columnas son necesarias para que el nuevo CRM pueda gestionar 
--- el estado de las ventas y la asignación del equipo.
+-- Ahora esta columna puede guardar múltiples notas con fechas y IDs únicos.

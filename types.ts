@@ -19,6 +19,14 @@ export interface Agent {
   email: string;
 }
 
+export interface PropertyNote {
+  id: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+  agentName?: string;
+}
+
 export interface Property {
   id: string;
   title: string;
@@ -37,7 +45,7 @@ export interface Property {
   featured: boolean;
   status: PropertyStatus;
   agentId?: string;
-  agentNotes?: string;
+  agentNotes?: PropertyNote[];
 }
 
 export interface FilterState {
