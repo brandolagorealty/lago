@@ -173,16 +173,53 @@ export const propertyService = {
     ];
   },
 
-  // Update property status/agent
-  async updateProperty(id: string, updates: Partial<PropertyDB>): Promise<{ success: boolean; error?: string }> {
+  // Update property
+  async updateProperty(id: string, updates: Partial<Property>): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    // Convert frontend model to DB model for the updates
+    const dbUpdates: any = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.price !== undefined) dbUpdates.price = updates.price;
+    if (updates.location !== undefined) dbUpdates.location = updates.location;
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.listingType !== undefined) dbUpdates.listing_type = updates.listingType;
+    if (updates.beds !== undefined) dbUpdates.beds = updates.beds;
+    if (updates.baths !== undefined) dbUpdates.baths = updates.baths;
+    if (updates.sqft !== undefined) dbUpdates.sqft = updates.sqft;
+    if (updates.image !== undefined) dbUpdates.image_url = updates.image;
+    if (updates.images !== undefined) dbUpdates.images = updates.images;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.shortDescription !== undefined) dbUpdates.short_description = updates.shortDescription;
+    if (updates.features !== undefined) dbUpdates.features = updates.features;
+    if (updates.featured !== undefined) dbUpdates.featured = updates.featured;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.agentId !== undefined) dbUpdates.agent_id = updates.agentId || null;
+    if (updates.agentNotes !== undefined) dbUpdates.agent_notes = updates.agentNotes;
+
     const { error } = await supabase
       .from('properties')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id);
 
     if (error) {
       console.error('Error updating property:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  },
+
+  // Delete property
+  async deleteProperty(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { error } = await supabase
+      .from('properties')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting property:', error);
       return { success: false, error: error.message };
     }
     return { success: true };

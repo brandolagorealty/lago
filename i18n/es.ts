@@ -21,7 +21,7 @@ export const es: Translations = {
         listProperty: 'Publicar Propiedad',
     },
     hero: {
-        title: 'Encuentra tu Paraíso en el Zulia',
+        title: 'Encuentra tu Paraíso',
         subtitle: 'El portafolio más exclusivo de casas de lujo, villas y oportunidades comerciales en el occidente de Venezuela.',
         stats_years: 'Años de Experiencia',
         stats_volume: 'Volumen Gestionado',
@@ -51,8 +51,24 @@ export const es: Translations = {
         missionContent: 'Nos dedicamos a redefinir la experiencia inmobiliaria en el Zulia a través de la integridad, la innovación y un servicio inigualable. Nuestra misión es conectar a los clientes con propiedades que se adapten perfectamente a su estilo de vida y objetivos de inversión.',
         vision: 'Nuestra Visión',
         visionContent: 'Ser la agencia inmobiliaria más confiable y prestigiosa del occidente de Venezuela, reconocida mundialmente por nuestro portafolio exclusivo y nuestro compromiso con la excelencia.',
-        years: 'Años de Experiencia',
-        volume: 'Volumen Gestionado',
+        pillars: {
+            audiovisual: {
+                title: 'Producción Audiovisual',
+                subtitle: 'Fotografía y video de alto impacto que aceleran tu venta.'
+            },
+            marketing: {
+                title: 'Marketing Digital',
+                subtitle: 'Ads expertos en redes para captar clientes calificados.'
+            },
+            sales: {
+                title: 'Gestión de Ventas',
+                subtitle: 'CRM y equipo especializado para cierres eficientes.'
+            },
+            strategy: {
+                title: 'Captación Estratégica',
+                subtitle: 'Seleccionamos los mejores inmuebles del mercado.'
+            }
+        }
     },
     form: {
         title: 'Publica tu Propiedad',
@@ -131,6 +147,7 @@ export const es: Translations = {
             name: 'Nombre Completo',
             email: 'Correo Electrónico',
             message: 'Mensaje',
+            messagePlaceholder: '¿En qué podemos ayudarte?',
             send: 'Enviar Mensaje',
             info: 'Información de Contacto',
         },

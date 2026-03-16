@@ -51,8 +51,24 @@ export const en: Translations = {
         missionContent: 'We are dedicated to redefining the real estate experience in Zulia through integrity, innovation, and unparalleled service. Our mission is to connect clients with properties that perfectly match their lifestyle and investment goals, ensuring transparency at every step.',
         vision: 'Our Vision',
         visionContent: 'To be the most trusted and prestigious real estate agency in Western Venezuela, recognized globally for our exclusive portfolio and our commitment to excellence in every transaction.',
-        years: 'Years of Experience',
-        volume: 'Volume Managed',
+        pillars: {
+            audiovisual: {
+                title: 'Audiovisual Production',
+                subtitle: 'High-impact photography and video that speed up your sale.'
+            },
+            marketing: {
+                title: 'Digital Marketing',
+                subtitle: 'Expert social media ads to capture qualified leads.'
+            },
+            sales: {
+                title: 'Sales Management',
+                subtitle: 'CRM and specialized team for efficient closings.'
+            },
+            strategy: {
+                title: 'Strategic Sourcing',
+                subtitle: 'We select the best properties on the market.'
+            }
+        }
     },
     form: {
         title: 'List Your Property',
@@ -131,6 +147,7 @@ export const en: Translations = {
             name: 'Full Name',
             email: 'Email Address',
             message: 'Message',
+            messagePlaceholder: 'How can we help you?',
             send: 'Send Message',
             info: 'Contact Information',
         },

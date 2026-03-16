@@ -49,7 +49,7 @@ const Contact: React.FC = () => {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] uppercase font-bold tracking-widest text-brand-black/40 ml-1">{t.support.contact.message}</label>
-                                    <textarea rows={6} className="w-full bg-brand-black/[0.03] border-none rounded-3xl p-6 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none resize-none" placeholder="How can we help you?"></textarea>
+                                    <textarea rows={6} className="w-full bg-brand-black/[0.03] border-none rounded-3xl p-6 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none resize-none" placeholder={t.support.contact.messagePlaceholder}></textarea>
                                 </div>
                                 <button className="w-full md:w-auto bg-brand-black text-white px-12 py-5 rounded-full font-bold text-sm hover:bg-brand-green transition-all shadow-xl shadow-brand-black/20 hover:shadow-brand-green/20 uppercase tracking-widest active:scale-95">
                                     {t.support.contact.send}
@@ -70,7 +70,7 @@ const Contact: React.FC = () => {
                                         </div>
                                         <div>
                                             <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Office</p>
-                                            <p className="text-sm font-light">Av. El Milagro, Maracaibo, Zulia.</p>
+                                            <p className="text-sm font-light">Torre Empresarial Claret, entre Av. 78 (Dr. Portillo) y Av. 79. Maracaibo, Zulia.</p>
                                         </div>
                                     </div>
 

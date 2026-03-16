@@ -7,27 +7,28 @@ import { ZULIA_CITIES } from '../constants/locations';
 interface PropertyFormProps {
   onClose: () => void;
   onSave: (property: Property) => Promise<void>;
+  initialData?: Property;
 }
 
-const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
+const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialData }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
-    title: '',
-    price: '',
-    location: '',
-    type: 'House',
-    listingType: 'sale', // Default to sale
-    beds: '1',
-    baths: '1',
-    sqft: '500',
-    description: '',
-    shortDescription: '',
-    features: { general: [], interior: [], exterior: [] } as { general: string[], interior: string[], exterior: string[] },
-    image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800',
-    images: [] as string[],
-    status: 'available' as any,
-    agentId: '',
-    agentNotes: ''
+    title: initialData?.title || '',
+    price: initialData?.price?.toString() || '',
+    location: initialData?.location || '',
+    type: initialData?.type || 'House',
+    listingType: initialData?.listingType || 'sale',
+    beds: initialData?.beds?.toString() || '1',
+    baths: initialData?.baths?.toString() || '1',
+    sqft: initialData?.sqft?.toString() || '500',
+    description: initialData?.description || '',
+    shortDescription: initialData?.shortDescription || '',
+    features: initialData?.features || { general: [], interior: [], exterior: [] },
+    image: initialData?.image || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800',
+    images: initialData?.images || [] as string[],
+    status: initialData?.status || 'available' as any,
+    agentId: initialData?.agentId || '',
+    agentNotes: initialData?.agentNotes ? '' : '' // Notes are managed separately in Admin, but kept here for schema
   });
   const [agents, setAgents] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,13 +87,13 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const newProperty: Property = {
-      id: Date.now().toString(),
+    const propertyToSave: Property = {
+      id: initialData?.id || Date.now().toString(),
       title: formData.title,
       price: Number(formData.price),
       location: formData.location,
       type: formData.type as any,
-      listingType: formData.listingType as any, // Add to property object
+      listingType: formData.listingType as any,
       beds: Number(formData.beds),
       baths: Number(formData.baths),
       sqft: Number(formData.sqft),
@@ -100,15 +101,24 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
       description: formData.description,
       shortDescription: formData.shortDescription,
       features: formData.features,
-      images: formData.images, // Add gallery
-      featured: false,
+      images: formData.images,
+      featured: initialData?.featured || false,
       status: formData.status,
       agentId: formData.agentId || undefined,
-      agentNotes: formData.agentNotes
+      agentNotes: initialData?.agentNotes || []
     };
-    await onSave(newProperty);
+    await onSave(propertyToSave);
     setIsSubmitting(false);
     onClose();
+  };
+
+  const moveImage = (index: number, direction: 'up' | 'down') => {
+    const newImages = [...formData.images];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newImages.length) return;
+
+    [newImages[index], newImages[targetIndex]] = [newImages[targetIndex], newImages[index]];
+    setFormData({ ...formData, images: newImages });
   };
 
   return (
@@ -117,8 +127,12 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
       <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
-            <h2 className="text-2xl font-serif font-bold text-slate-900">{t.form.title}</h2>
-            <p className="text-slate-500 text-sm">{t.form.subtitle}</p>
+            <h2 className="text-2xl font-serif font-bold text-slate-900">
+              {initialData ? 'Editar Propiedad' : t.form.title}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {initialData ? 'Actualiza los detalles del inmueble' : t.form.subtitle}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 hover:text-slate-900">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,10 +373,30 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
               {formData.images.map((imgUrl, idx) => (
                 <div key={idx} className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="flex-grow space-y-2">
+                    <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveImage(idx, 'up')}
+                        disabled={idx === 0}
+                        className="p-1 text-slate-400 hover:text-brand-green disabled:opacity-30 disabled:hover:text-slate-400"
+                        title="Subir"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveImage(idx, 'down')}
+                        disabled={idx === formData.images.length - 1}
+                        className="p-1 text-slate-400 hover:text-brand-green disabled:opacity-30 disabled:hover:text-slate-400"
+                        title="Bajar"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                    </div>
                     <input
                       type="url"
                       placeholder="https://..."
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green/20"
+                      className="flex-grow bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green/20"
                       value={imgUrl}
                       onChange={(e) => {
                         const newImages = [...formData.images];
@@ -405,7 +439,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave }) => {
 
           <div className="md:col-span-2 pt-4">
             <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-              {isSubmitting ? t.form.submitting : t.form.submit}
+              {isSubmitting ? t.form.submitting : (initialData ? 'Guardar Cambios' : t.form.submit)}
             </button>
           </div>
         </form>

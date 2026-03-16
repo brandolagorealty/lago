@@ -6,8 +6,8 @@ const Footer: React.FC = () => {
     const { t } = useLanguage();
 
     const socialLinks = [
-        { name: 'Instagram', url: '#', icon: 'M16 3H8C5.23858 3 3 5.23858 3 8V16C3 18.7614 5.23858 21 8 21H16C18.7614 21 21 18.7614 21 16V8C21 5.23858 18.7614 3 16 3ZM12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12C17 14.7614 14.7614 17 12 17ZM16.5 7.5C16.5 8.05228 16.0523 8.5 15.5 8.5C14.9477 8.5 14.5 8.05228 14.5 7.5C14.5 6.94772 14.9477 6.5 15.5 6.5C16.0523 6.5 16.5 6.94772 16.5 7.5Z' },
-        { name: 'Facebook', url: '#', icon: 'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3V2z' },
+        { name: 'Instagram', url: 'https://www.instagram.com/lagorealty/', icon: 'M16 3H8C5.23858 3 3 5.23858 3 8V16C3 18.7614 5.23858 21 8 21H16C18.7614 21 21 18.7614 21 16V8C21 5.23858 18.7614 3 16 3ZM12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12C17 14.7614 14.7614 17 12 17ZM16.5 7.5C16.5 8.05228 16.0523 8.5 15.5 8.5C14.9477 8.5 14.5 8.05228 14.5 7.5C14.5 6.94772 14.9477 6.5 15.5 6.5C16.0523 6.5 16.5 6.94772 16.5 7.5Z' },
+        { name: 'Facebook', url: 'https://www.facebook.com/profile.php?id=61586723213070', icon: 'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3V2z' },
         { name: 'LinkedIn', url: '#', icon: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z M4 2a2 2 0 11-2 2 2 2 0 012-2z' }
     ];
 
@@ -28,6 +28,8 @@ const Footer: React.FC = () => {
                                 <a
                                     key={social.name}
                                     href={social.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brand-green hover:text-white transition-all text-slate-400"
                                     aria-label={social.name}
                                 >
@@ -67,7 +69,7 @@ const Footer: React.FC = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                <span className="text-slate-400 text-sm group-hover:text-white transition-colors">Maracaibo, Estado Zulia, Venezuela.</span>
+                                <span className="text-slate-400 text-sm group-hover:text-white transition-colors">Torre Empresarial Claret, entre Av. 78 (Dr. Portillo) y Av. 79. Maracaibo, Zulia.</span>
                             </li>
                             <li className="flex items-center group">
                                 <svg className="w-5 h-5 text-brand-green mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

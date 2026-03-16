@@ -49,8 +49,12 @@ export type Translations = {
         missionContent: string;
         vision: string;
         visionContent: string;
-        years: string;
-        volume: string;
+        pillars: {
+            audiovisual: { title: string; subtitle: string };
+            marketing: { title: string; subtitle: string };
+            sales: { title: string; subtitle: string };
+            strategy: { title: string; subtitle: string };
+        };
     };
     form: {
         title: string;
@@ -129,6 +133,7 @@ export type Translations = {
             name: string;
             email: string;
             message: string;
+            messagePlaceholder: string;
             send: string;
             info: string;
         };

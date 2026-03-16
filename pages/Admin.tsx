@@ -6,6 +6,54 @@ import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0
+    }).format(amount);
+};
+
+interface DeleteConfirmModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    title: string;
+}
+
+const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({ isOpen, onClose, onConfirm, title }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                <div className="flex items-center justify-center w-16 h-16 bg-red-50 rounded-full mb-6 mx-auto">
+                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 text-center mb-2">¿Eliminar Propiedad?</h3>
+                <p className="text-slate-500 text-center mb-8">
+                    Estás a punto de eliminar <span className="font-semibold text-slate-700">"{title}"</span>. Esta acción es permanente y no se puede deshacer.
+                </p>
+                <div className="flex gap-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                    >
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const Admin: React.FC = () => {
     const { signOut, user } = useAuth();
     const navigate = useNavigate();
@@ -17,6 +65,8 @@ const Admin: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [agentFilter, setAgentFilter] = useState<string | null>(null);
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+    const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+    const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
@@ -51,13 +101,23 @@ const Admin: React.FC = () => {
     };
 
     const handleSaveProperty = async (property: Property) => {
-        const { id, ...propertyData } = property;
-        const result = await propertyService.createProperty(propertyData, true);
+        const isEditing = !!properties.find(p => p.id === property.id);
+        let result;
+
+        if (isEditing) {
+            result = await propertyService.updateProperty(property.id, property);
+        } else {
+            const { id, ...propertyData } = property;
+            result = await propertyService.createProperty(propertyData, true);
+        }
+
         if (result.success) {
             await fetchData();
             setShowForm(false);
+            setEditingProperty(null);
+            setToast({ message: isEditing ? 'Propiedad actualizada' : 'Propiedad creada', type: 'success' });
         } else {
-            alert('Error: ' + result.error?.message);
+            alert('Error: ' + (result.error?.message || result.error));
         }
     };
 
@@ -72,7 +132,7 @@ const Admin: React.FC = () => {
     };
 
     const updatePropertyAgent = async (id: string, agentId: string) => {
-        const result = await propertyService.updateProperty(id, { agent_id: agentId });
+        const result = await propertyService.updateProperty(id, { agentId });
         if (result.success) {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, agentId } : p));
             setToast({ message: 'Agente asignado correctamente', type: 'success' });
@@ -82,14 +142,7 @@ const Admin: React.FC = () => {
     };
 
     const handleUpdateProperty = async (id: string, updates: Partial<Property>) => {
-        // Convert camelCase to snake_case for Supabase
-        const dbUpdates: any = {};
-        if (updates.status) dbUpdates.status = updates.status;
-        if (updates.agentId !== undefined) dbUpdates.agent_id = updates.agentId || null;
-        if (updates.agentNotes !== undefined) dbUpdates.agent_notes = updates.agentNotes;
-        if (updates.price) dbUpdates.price = updates.price;
-
-        const result = await propertyService.updateProperty(id, dbUpdates);
+        const result = await propertyService.updateProperty(id, updates);
         if (result.success) {
             setProperties(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
             if (selectedProperty?.id === id) {
@@ -99,6 +152,22 @@ const Admin: React.FC = () => {
         } else {
             setToast({ message: 'Error al actualizar la propiedad', type: 'error' });
         }
+    };
+
+    const handleDeleteProperty = async (id: string) => {
+        console.log('Procediendo con la eliminación en Supabase para ID:', id);
+        setToast({ message: 'Eliminando propiedad...', type: 'success' });
+
+        const result = await propertyService.deleteProperty(id);
+        if (result.success) {
+            console.log('Propiedad eliminada con éxito');
+            setProperties(prev => prev.filter(p => p.id !== id));
+            setToast({ message: 'Propiedad eliminada correctamente', type: 'success' });
+        } else {
+            console.error('Error al eliminar propiedad:', result.error);
+            setToast({ message: 'Error al eliminar la propiedad: ' + result.error, type: 'error' });
+        }
+        setPropertyToDelete(null);
     };
 
     const filteredProperties = useMemo(() => {
@@ -543,9 +612,28 @@ const Admin: React.FC = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <button className="p-2 text-slate-400 hover:text-brand-green transition-colors hover:bg-white rounded-full">
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                                    </button>
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingProperty(property);
+                                                            }}
+                                                            className="p-2 text-slate-400 hover:text-brand-green transition-colors hover:bg-white rounded-full"
+                                                            title="Editar"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setPropertyToDelete(property);
+                                                            }}
+                                                            className="p-2 text-slate-400 hover:text-red-600 transition-colors hover:bg-white rounded-full"
+                                                            title="Eliminar"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -633,9 +721,13 @@ const Admin: React.FC = () => {
                 )}
             </main>
 
-            {showForm && (
+            {(showForm || editingProperty) && (
                 <PropertyForm
-                    onClose={() => setShowForm(false)}
+                    initialData={editingProperty || undefined}
+                    onClose={() => {
+                        setShowForm(false);
+                        setEditingProperty(null);
+                    }}
                     onSave={handleSaveProperty}
                 />
             )}
@@ -660,6 +752,14 @@ const Admin: React.FC = () => {
                         <span className="font-bold text-sm tracking-tight">{toast.message}</span>
                     </div>
                 </div>
+            )}
+            {propertyToDelete && (
+                <DeleteConfirmModal
+                    isOpen={!!propertyToDelete}
+                    title={propertyToDelete.title}
+                    onClose={() => setPropertyToDelete(null)}
+                    onConfirm={() => handleDeleteProperty(propertyToDelete.id)}
+                />
             )}
         </div>
     );

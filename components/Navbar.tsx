@@ -62,10 +62,10 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
           <div className="flex items-center space-x-4">
             <button
               onClick={toggleLanguage}
-              className="flex items-center space-x-1 px-3 py-2 rounded-full bg-slate-200 hover:bg-brand-blue/20 transition-colors text-sm font-bold text-brand-black"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-brand-green hover:text-white transition-all text-lg shadow-sm border border-slate-200 hover:border-brand-green"
+              title={language === 'en' ? 'Switch to Spanish' : 'Cambiar a Inglés'}
             >
               <span>{language === 'en' ? '🇺🇸' : '🇪🇸'}</span>
-              <span>{language === 'en' ? 'EN' : 'ES'}</span>
             </button>
           </div>
         </div>
