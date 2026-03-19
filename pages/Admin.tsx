@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import PropertyForm from '../components/PropertyForm';
 import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus } from '../types';
 import { propertyService } from '../services/supabase';
@@ -74,6 +76,12 @@ const Admin: React.FC = () => {
     const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
     const [showAgentForm, setShowAgentForm] = useState(false);
     const [isSavingAgent, setIsSavingAgent] = useState(false);
+
+    // Cropper states
+    const [cropImgSrc, setCropImgSrc] = useState<string>('');
+    const imgRef = useRef<HTMLImageElement>(null);
+    const [crop, setCrop] = useState<Crop>();
+    const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
 
     useEffect(() => {
         if (toast) {
@@ -194,12 +202,12 @@ const Admin: React.FC = () => {
         const form = e.currentTarget;
         const formData = new FormData(form);
 
-        const agentData = {
-            name: formData.get('name') as string,
-            role: formData.get('role') as string,
-            email: formData.get('email') as string,
-            phone: formData.get('phone') as string,
-            avatar: (formData.get('avatar_url') as string) || (editingAgent?.avatar || '')
+        const agentData: any = {
+            name: (formData.get('name') as string),
+            role: (formData.get('role') as string),
+            email: (formData.get('email') as string),
+            phone: (formData.get('phone') as string),
+            avatar: (formData.get('avatar_url') as string)
         };
 
         let result;
@@ -231,19 +239,68 @@ const Admin: React.FC = () => {
         }
     };
 
-    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setToast({ message: 'Subiendo foto...', type: 'success' });
-        const url = await propertyService.uploadAgentAvatar(file);
-        if (url) {
-            const avatarInput = document.getElementById('agent-avatar-input') as HTMLInputElement;
-            if (avatarInput) avatarInput.value = url;
-            setToast({ message: 'Foto subida con éxito', type: 'success' });
-        } else {
-            setToast({ message: 'Error al subir foto', type: 'error' });
+    const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            setCrop(undefined);
+            setCompletedCrop(undefined);
+            const reader = new FileReader();
+            reader.addEventListener('load', () => setCropImgSrc(reader.result?.toString() || ''));
+            reader.readAsDataURL(e.target.files[0]);
         }
+    };
+
+    const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const { width, height } = e.currentTarget;
+        const crop = centerCrop(
+            makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
+            width, height
+        );
+        setCrop(crop);
+    };
+
+    const handleAvatarUpload = async () => {
+        if (!completedCrop || !imgRef.current) return;
+        setToast({ message: 'Preparando foto...', type: 'success' });
+        
+        const canvas = document.createElement('canvas');
+        const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
+        const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+        canvas.width = completedCrop.width;
+        canvas.height = completedCrop.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        ctx.drawImage(
+            imgRef.current,
+            completedCrop.x * scaleX,
+            completedCrop.y * scaleY,
+            completedCrop.width * scaleX,
+            completedCrop.height * scaleY,
+            0, 0, completedCrop.width, completedCrop.height
+        );
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+            setToast({ message: 'Subiendo foto...', type: 'success' });
+            const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+            const url = await propertyService.uploadAgentAvatar(file);
+            if (url) {
+                // Find input by name or use a better way
+                const form = document.querySelector('form') as HTMLFormElement;
+                if (form) {
+                    const avatarInput = form.querySelector('input[name="avatar_url"]') as HTMLInputElement;
+                    if (avatarInput) {
+                        avatarInput.value = url;
+                        // Trigger an input event so any listeners would know (though not strictly needed for FormData)
+                        avatarInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+                setToast({ message: 'Foto subida con éxito', type: 'success' });
+                setCropImgSrc('');
+            } else {
+                setToast({ message: 'Error al subir foto', type: 'error' });
+            }
+        }, 'image/jpeg', 0.95);
     };
 
     const filteredProperties = useMemo(() => {
@@ -579,7 +636,7 @@ const Admin: React.FC = () => {
                                                     <p className="font-bold text-slate-900">{lead.name}</p>
                                                     <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1">
                                                         <span className="text-xs text-slate-500 font-medium whitespace-nowrap"><a href={`mailto:${lead.email}`} className="hover:text-brand-green">{lead.email}</a></span>
-                                                        {lead.phone && <span className="text-xs text-slate-500 font-medium whitespace-nowrap"><a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="hover:text-brand-green">{lead.phone}</a></span>}
+                                                        {lead.phone && <span className="text-xs text-slate-500 font-medium whitespace-nowrap"><a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all font-bold group shadow-sm hover:shadow-md"><svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .011 5.403.008 12.039c0 2.12.54 4.188 1.564 6.09L0 24l6.101-1.599a11.82 11.82 0 005.946 1.599h.005c6.635 0 12.038-5.403 12.041-12.039a11.85 11.85 0 00-3.538-8.513z" /></svg>{lead.phone}</a></span>}
                                                     </div>
                                                     <div className="mt-3 p-3 bg-slate-100 rounded-xl text-xs text-slate-600 italic">
                                                         "{lead.message}"
@@ -996,16 +1053,42 @@ const Admin: React.FC = () => {
                                 <div className="flex justify-between items-center">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">URL de Foto (Avatar)</label>
                                     <label className="text-xs font-bold text-brand-green hover:underline cursor-pointer uppercase tracking-widest">
-                                        Subir Archivo
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                                        Seleccionar Foto
+                                        <input type="file" className="hidden" accept="image/*" onChange={onSelectFile} />
                                     </label>
                                 </div>
-                                <input id="agent-avatar-input" name="avatar_url" defaultValue={editingAgent?.avatar} placeholder="https://..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" />
+                                <input 
+                                    name="avatar_url" 
+                                    defaultValue={editingAgent?.avatar} 
+                                    placeholder="https://..." 
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" 
+                                />
                             </div>
                             <button disabled={isSavingAgent} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50">
                                 {isSavingAgent ? 'Guardando...' : (editingAgent ? 'Guardar Cambios' : 'Registrar Asesor')}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {cropImgSrc && (
+                <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setCropImgSrc('')}></div>
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in duration-300">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-slate-900 text-lg">Recortar Foto de Perfil</h3>
+                            <button type="button" onClick={() => setCropImgSrc('')} className="p-2 text-slate-400 hover:bg-white rounded-full transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-grow flex flex-col items-center bg-slate-100/50">
+                            <ReactCrop crop={crop} onChange={(_, percentCrop) => setCrop(percentCrop)} onComplete={(c) => setCompletedCrop(c)} aspect={1} circularCrop>
+                                <img ref={imgRef} alt="Crop" src={cropImgSrc} onLoad={onImageLoad} className="max-h-[50vh] object-contain rounded-xl shadow-sm" />
+                            </ReactCrop>
+                        </div>
+                        <div className="p-6 border-t border-slate-100 flex gap-4 bg-white">
+                            <button type="button" onClick={() => setCropImgSrc('')} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+                            <button type="button" onClick={handleAvatarUpload} className="flex-1 py-3 font-bold text-white bg-brand-green rounded-xl hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20">Aplicar y Subir</button>
+                        </div>
                     </div>
                 </div>
             )}
