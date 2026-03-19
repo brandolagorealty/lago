@@ -89,6 +89,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           <div className="flex items-center">
             <span className="font-bold mr-1">{property.sqft.toLocaleString()}</span> {t.common.sqft}
           </div>
+          {property.agentIds && property.agentIds.length > 0 && (
+            <div className="ml-auto flex -space-x-1.5 overflow-hidden">
+              <div className="h-6 w-6 rounded-full bg-brand-green/10 border border-brand-green/20 flex items-center justify-center">
+                <svg className="w-3 h-3 text-brand-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

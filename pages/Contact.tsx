@@ -1,14 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useLanguage } from '../i18n/LanguageContext';
+import { propertyService } from '../services/supabase';
 
 const Contact: React.FC = () => {
     const { t } = useLanguage();
+    const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!formData.name || !formData.email || !formData.message) {
+            setToast({ message: 'Por favor, llena todos los campos', type: 'error' });
+            return;
+        }
+
+        setIsSubmitting(true);
+        const result = await propertyService.createLead({
+            name: formData.name,
+            email: formData.email,
+            phone: '', // No phone field in this form right now
+            message: formData.message
+        });
+
+        if (result.success) {
+            setToast({ message: '¡Gracias! Tu mensaje ha sido enviado exitosamente. Te contactaremos pronto.', type: 'success' });
+            setFormData({ name: '', email: '', message: '' });
+        } else {
+            console.error(result.error);
+            setToast({ message: 'Hubo un error al enviar tu mensaje. Intenta nuevamente.', type: 'error' });
+        }
+        setIsSubmitting(false);
+    };
 
     return (
         <div className="min-h-screen bg-brand-white flex flex-col">
             <Navbar currentView="none" onNavigate={() => { }} onOpenForm={() => { }} />
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+                    <div className={`px-6 py-3 rounded-full shadow-lg font-bold text-sm ${toast.type === 'success' ? 'bg-brand-green text-white' : 'bg-red-500 text-white'}`}>
+                        {toast.message}
+                    </div>
+                </div>
+            )}
 
             <main className="flex-grow">
                 {/* Hero Contact Section */}
@@ -36,23 +82,48 @@ const Contact: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Form Card */}
                         <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-2xl p-8 md:p-12 border border-brand-black/5 animate-slide-up">
-                            <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+                            <form className="space-y-8" onSubmit={handleSubmit}>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-2">
                                         <label className="text-[10px] uppercase font-bold tracking-widest text-brand-black/40 ml-1">{t.support.contact.name}</label>
-                                        <input type="text" placeholder="John Doe" className="w-full bg-brand-black/[0.03] border-none rounded-2xl p-4 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none" />
+                                        <input
+                                            type="text"
+                                            placeholder="John Doe"
+                                            className="w-full bg-brand-black/[0.03] border-none rounded-2xl p-4 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            disabled={isSubmitting}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] uppercase font-bold tracking-widest text-brand-black/40 ml-1">{t.support.contact.email}</label>
-                                        <input type="email" placeholder="john@example.com" className="w-full bg-brand-black/[0.03] border-none rounded-2xl p-4 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none" />
+                                        <input
+                                            type="email"
+                                            placeholder="john@example.com"
+                                            className="w-full bg-brand-black/[0.03] border-none rounded-2xl p-4 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            disabled={isSubmitting}
+                                        />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] uppercase font-bold tracking-widest text-brand-black/40 ml-1">{t.support.contact.message}</label>
-                                    <textarea rows={6} className="w-full bg-brand-black/[0.03] border-none rounded-3xl p-6 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none resize-none" placeholder={t.support.contact.messagePlaceholder}></textarea>
+                                    <textarea
+                                        rows={6}
+                                        className="w-full bg-brand-black/[0.03] border-none rounded-3xl p-6 text-sm focus:ring-2 ring-brand-green/20 transition-all outline-none resize-none"
+                                        placeholder={t.support.contact.messagePlaceholder}
+                                        value={formData.message}
+                                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                                        disabled={isSubmitting}
+                                    ></textarea>
                                 </div>
-                                <button className="w-full md:w-auto bg-brand-black text-white px-12 py-5 rounded-full font-bold text-sm hover:bg-brand-green transition-all shadow-xl shadow-brand-black/20 hover:shadow-brand-green/20 uppercase tracking-widest active:scale-95">
-                                    {t.support.contact.send}
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="w-full md:w-auto bg-brand-black text-white px-12 py-5 rounded-full font-bold text-sm hover:bg-brand-green transition-all shadow-xl shadow-brand-black/20 hover:shadow-brand-green/20 uppercase tracking-widest active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    {isSubmitting ? 'Enviando...' : t.support.contact.send}
                                 </button>
                             </form>
                         </div>

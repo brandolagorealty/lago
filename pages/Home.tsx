@@ -30,9 +30,11 @@ const Home: React.FC = () => {
             setIsLoading(true);
             try {
                 const data = await propertyService.getPublishedProperties();
-                setProperties(data.length > 0 ? data : PROPERTIES);
+                // Only use mock data if nothing is returned from Supabase
+                // or if Supabase is not configured (checked inside getPublishedProperties)
+                setProperties(data);
             } catch (error) {
-                console.log('Using local property data (Supabase not configured)');
+                console.log('Using local property data due to error');
                 setProperties(PROPERTIES);
             }
             setIsLoading(false);

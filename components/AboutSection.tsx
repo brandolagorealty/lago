@@ -13,7 +13,7 @@ const AboutSection: React.FC = () => {
             <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-slate-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-pulse delay-1000"></div>
             <div className="relative aspect-square rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src="https://picsum.photos/seed/team/800/800"
+                src="https://scdztnzkzrvjgyefunkw.supabase.co/storage/v1/object/public/assets/photo_2026-03-18_10-27-54.jpg"
                 alt="Our Team"
                 className="w-full h-full object-cover"
               />

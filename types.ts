@@ -17,6 +17,7 @@ export interface Agent {
   avatar: string;
   role: string;
   email: string;
+  phone?: string;
 }
 
 export interface PropertyNote {
@@ -44,7 +45,8 @@ export interface Property {
   features?: PropertyFeatures; // Grouped features
   featured: boolean;
   status: PropertyStatus;
-  agentId?: string;
+  isPublished: boolean;
+  agentIds?: string[];
   agentNotes?: PropertyNote[];
 }
 
@@ -54,4 +56,19 @@ export interface FilterState {
   minPrice: string;
   maxPrice: string;
   location: string;
+}
+
+export type LeadStatus = 'new' | 'contacted' | 'visiting' | 'negotiating' | 'closed' | 'lost';
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  property_id?: string;
+  agent_id?: string;
+  status: LeadStatus;
+  notes?: any[]; // Reusing the JSON structure similar to agentNotes
+  created_at: string;
 }

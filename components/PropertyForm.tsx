@@ -6,7 +6,7 @@ import { ZULIA_CITIES } from '../constants/locations';
 
 interface PropertyFormProps {
   onClose: () => void;
-  onSave: (property: Property) => Promise<void>;
+  onSave: (property: Property, isPublished?: boolean) => Promise<void>;
   initialData?: Property;
 }
 
@@ -27,7 +27,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
     image: initialData?.image || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800',
     images: initialData?.images || [] as string[],
     status: initialData?.status || 'available' as any,
-    agentId: initialData?.agentId || '',
+    agentIds: initialData?.agentIds || [],
     agentNotes: initialData?.agentNotes ? '' : '' // Notes are managed separately in Admin, but kept here for schema
   });
   const [agents, setAgents] = useState<any[]>([]);
@@ -59,36 +59,35 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
         }
 
         const url = await propertyService.uploadImage(file);
-        if (url) {
-          uploadedUrls.push(url);
-        }
+        if (url) uploadedUrls.push(url);
       }
 
-      if (target === 'main') {
-        if (uploadedUrls.length > 0) {
+      if (uploadedUrls.length > 0) {
+        if (target === 'main') {
           setFormData(prev => ({ ...prev, image: uploadedUrls[0] }));
+        } else {
+          setFormData(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
         }
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...uploadedUrls]
-        }));
       }
     } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Failed to upload image');
+      console.error('Error uploading:', error);
+      alert('Error uploading files');
     } finally {
       setUploading(false);
-      // Clear input value to allow selecting same file again
-      e.target.value = '';
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveBtn = async (isPublished: boolean) => {
     setIsSubmitting(true);
+    // Remove the required attribute checks by bypassing native form submit, or do basic validation
+    if (!formData.title || !formData.price || !formData.location) {
+      alert("Por favor completa los campos principales (Título, Precio, Ubicación)");
+      setIsSubmitting(false);
+      return;
+    }
+
     const propertyToSave: Property = {
-      id: initialData?.id || Date.now().toString(),
+      id: initialData?.id || '',
       title: formData.title,
       price: Number(formData.price),
       location: formData.location,
@@ -104,10 +103,11 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
       images: formData.images,
       featured: initialData?.featured || false,
       status: formData.status,
-      agentId: formData.agentId || undefined,
-      agentNotes: initialData?.agentNotes || []
+      agentIds: formData.agentIds,
+      agentNotes: initialData?.agentNotes || [],
+      isPublished: isPublished
     };
-    await onSave(propertyToSave);
+    await onSave(propertyToSave, isPublished);
     setIsSubmitting(false);
     onClose();
   };
@@ -141,7 +141,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <form onSubmit={(e) => e.preventDefault()} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="md:col-span-2 space-y-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.form.labels.title}</label>
             <input required type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -280,17 +280,27 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
           {/* CRM Details - Agent, Status & Notes */}
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Asignar Agente</label>
-              <select
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20"
-                value={formData.agentId}
-                onChange={e => setFormData({ ...formData, agentId: e.target.value })}
-              >
-                <option value="">Seleccionar Agente...</option>
+              <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Asignar Agente(s)</label>
+              <div className="max-h-32 overflow-y-auto w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none flex flex-col gap-2 custom-scrollbar">
+                {agents.length === 0 && <span className="text-sm text-slate-400">Cargando agentes...</span>}
                 {agents.map(agent => (
-                  <option key={agent.id} value={agent.id}>{agent.name} ({agent.role})</option>
+                  <label key={agent.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      value={agent.id}
+                      checked={formData.agentIds.includes(agent.id)}
+                      onChange={e => {
+                        const newAgentIds = e.target.checked
+                          ? [...formData.agentIds, agent.id]
+                          : formData.agentIds.filter((id: string) => id !== agent.id);
+                        setFormData({ ...formData, agentIds: newAgentIds });
+                      }}
+                      className="form-checkbox text-brand-green rounded"
+                    />
+                    <span className="text-sm font-semibold">{agent.name} <span className="text-slate-400 font-normal">({agent.role})</span></span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Estatus de Propiedad</label>
@@ -437,9 +447,22 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
             </div>
           </div>
 
-          <div className="md:col-span-2 pt-4">
-            <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-              {isSubmitting ? t.form.submitting : (initialData ? 'Guardar Cambios' : t.form.submit)}
+          <div className="md:col-span-2 pt-4 flex gap-4">
+            <button
+              type="button"
+              onClick={() => handleSaveBtn(false)}
+              disabled={isSubmitting}
+              className="flex-1 bg-white text-slate-900 border border-slate-200 py-4 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? t.form.submitting : (initialData ? 'Guardar como Borrador' : 'Crear como Borrador')}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveBtn(true)}
+              disabled={isSubmitting}
+              className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? t.form.submitting : (initialData ? 'Publicar Cambios' : 'Publicar Propiedad')}
             </button>
           </div>
         </form>
