@@ -3,6 +3,7 @@ import { Property } from '../types';
 import { propertyService } from '../services/supabase';
 import { useLanguage } from '../i18n/LanguageContext';
 import { ZULIA_CITIES } from '../constants/locations';
+import imageCompression from 'browser-image-compression';
 
 interface PropertyFormProps {
   onClose: () => void;
@@ -54,12 +55,32 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
       for (const file of files) {
         // Validate file type
         if (!file.type.startsWith('image/')) {
-          alert('Only image files are allowed');
+          alert('Solo se permiten archivos de imagen');
           continue;
         }
 
-        const url = await propertyService.uploadImage(file);
-        if (url) uploadedUrls.push(url);
+        // Image Compression
+        const options = {
+          maxSizeMB: 1, // Max 1MB
+          maxWidthOrHeight: 1920, // Max Full HD
+          useWebWorker: true,
+        };
+
+        let fileToUpload = file;
+        try {
+          console.log(`Comprimiendo ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)...`);
+          fileToUpload = await imageCompression(file, options);
+          console.log(`Nueva medida: ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        } catch (error) {
+          console.error('Error compression, uploading original:', error);
+        }
+
+        const url = await propertyService.uploadImage(fileToUpload);
+        if (url) {
+          uploadedUrls.push(url);
+        } else {
+          alert('Error al subir ' + file.name);
+        }
       }
 
       if (uploadedUrls.length > 0) {
@@ -71,7 +92,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
       }
     } catch (error) {
       console.error('Error uploading:', error);
-      alert('Error uploading files');
+      alert('Error general al subir archivos');
     } finally {
       setUploading(false);
     }
@@ -97,16 +118,18 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
       baths: Number(formData.baths),
       sqft: Number(formData.sqft),
       image: formData.image,
+      images: formData.images,
       description: formData.description,
       shortDescription: formData.shortDescription,
       features: formData.features,
-      images: formData.images,
-      featured: initialData?.featured || false,
-      status: formData.status,
+      featured: formData.featured,
+      status: formData.status as any,
+      isPublished: isPublished,
       agentIds: formData.agentIds,
       agentNotes: initialData?.agentNotes || [],
-      isPublished: isPublished
     };
+
+    console.log('[DEBUG] PropertyForm: Final object to save:', propertyToSave.title, 'image:', propertyToSave.image);
     await onSave(propertyToSave, isPublished);
     setIsSubmitting(false);
     onClose();
@@ -150,7 +173,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.form.labels.price}</label>
-            <input required type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20"
+            <input required type="number" onWheel={(e) => e.currentTarget.blur()} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20"
               value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} placeholder={t.form.placeholders.price} />
           </div>
 
@@ -213,17 +236,17 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
           <div className="grid grid-cols-3 gap-4 md:col-span-2">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.form.labels.beds}</label>
-              <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none"
+              <input type="number" onWheel={(e) => e.currentTarget.blur()} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none"
                 value={formData.beds} onChange={e => setFormData({ ...formData, beds: e.target.value })} />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.form.labels.baths}</label>
-              <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none"
+              <input type="number" onWheel={(e) => e.currentTarget.blur()} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none"
                 value={formData.baths} onChange={e => setFormData({ ...formData, baths: e.target.value })} />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.form.labels.sqft}</label>
-              <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none"
+              <input type="number" onWheel={(e) => e.currentTarget.blur()} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none"
                 value={formData.sqft} onChange={e => setFormData({ ...formData, sqft: e.target.value })} />
             </div>
           </div>
@@ -330,25 +353,39 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
           {/* Main Image */}
           <div className="md:col-span-2 space-y-2">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Main Image</label>
-              <label className={`text-xs font-bold text-brand-blue hover:text-brand-green cursor-pointer uppercase tracking-widest ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                {uploading ? 'Uploading...' : 'Upload File'}
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Foto Principal</label>
+              <label className={`text-xs font-bold text-brand-green hover:underline cursor-pointer uppercase tracking-widest ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                {uploading ? 'Subiendo...' : 'Subir Archivo'}
                 <input
                   type="file"
-                  accept="image/png, image/jpeg, image/jpg"
+                  accept="image/*"
                   className="hidden"
                   onChange={(e) => handleFileUpload(e, 'main')}
                   disabled={uploading}
                 />
               </label>
             </div>
-            <input
-              type="url"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20"
-              value={formData.image}
-              onChange={e => setFormData({ ...formData, image: e.target.value })}
-              placeholder="https://... or upload a file"
-            />
+            <div className="space-y-3">
+              <input
+                type="url"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20"
+                value={formData.image}
+                onChange={e => {
+                  const val = e.target.value.trim();
+                  setFormData({ ...formData, image: val });
+                }}
+                placeholder="URL de la imagen o sube un archivo..."
+              />
+              {formData.image && (
+                <div className="relative h-48 w-full rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                  <img src={formData.image} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
+                    console.error('Error loading main image preview:', formData.image);
+                    e.currentTarget.style.display = 'none';
+                  }} />
+                  <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold rounded-md">PREVIEW</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Gallery Images Management */}
@@ -381,44 +418,44 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
 
             <div className="space-y-3">
               {formData.images.map((imgUrl, idx) => (
-                <div key={idx} className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="flex-grow space-y-2">
-                    <div className="flex flex-col gap-1">
-                      <button
-                        type="button"
-                        onClick={() => moveImage(idx, 'up')}
-                        disabled={idx === 0}
-                        className="p-1 text-slate-400 hover:text-brand-green disabled:opacity-30 disabled:hover:text-slate-400"
-                        title="Subir"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveImage(idx, 'down')}
-                        disabled={idx === formData.images.length - 1}
-                        className="p-1 text-slate-400 hover:text-brand-green disabled:opacity-30 disabled:hover:text-slate-400"
-                        title="Bajar"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                      </button>
+                <div key={idx} className="flex gap-4 items-start p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex-grow space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => moveImage(idx, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 text-slate-400 hover:text-brand-green disabled:opacity-30"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveImage(idx, 'down')}
+                          disabled={idx === formData.images.length - 1}
+                          className="p-1 text-slate-400 hover:text-brand-green disabled:opacity-30"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        className="flex-grow bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green/20"
+                        value={imgUrl}
+                        onChange={(e) => {
+                          const newImages = [...formData.images];
+                          newImages[idx] = e.target.value;
+                          setFormData({ ...formData, images: newImages });
+                        }}
+                      />
                     </div>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      className="flex-grow bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green/20"
-                      value={imgUrl}
-                      onChange={(e) => {
-                        const newImages = [...formData.images];
-                        newImages[idx] = e.target.value;
-                        setFormData({ ...formData, images: newImages });
-                      }}
-                    />
                     {imgUrl && (
-                      <div className="relative h-24 w-full rounded-lg overflow-hidden bg-slate-200">
+                      <div className="relative h-32 w-full rounded-xl overflow-hidden bg-slate-200 border border-slate-300">
                         <img
                           src={imgUrl}
-                          alt="Preview"
+                          alt="Gallery Preview"
                           className="w-full h-full object-cover"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
@@ -431,8 +468,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
                       const newImages = formData.images.filter((_, i) => i !== idx);
                       setFormData({ ...formData, images: newImages });
                     }}
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Remove image"
+                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>

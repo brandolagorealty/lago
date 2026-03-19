@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Property, PropertyType, Agent, PropertyStatus } from '../types';
 
@@ -20,36 +19,48 @@ if (supabaseUrl && supabaseAnonKey) {
 
 export const supabase = supabaseInstance;
 
+// Helper to ensure we have a valid URL for Supabase
+const ensureFullUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  
+  // If it looks like a Supabase path (e.g. "image.jpg" or "propiedades/image.jpg")
+  if (supabaseUrl && !url.includes(supabaseUrl)) {
+      // Normalize: remove leading slash, replace legacy 'properties/' with 'propiedades/'
+      let normalized = url.startsWith('/') ? url.substring(1) : url;
+      if (normalized.startsWith('properties/')) {
+        normalized = normalized.replace('properties/', 'propiedades/');
+      }
+      
+      // If the URL doesn't start with a known bucket, prepend 'propiedades/'
+      const hasBucket = normalized.startsWith('propiedades/') || normalized.startsWith('agents/');
+      const finalPath = hasBucket ? normalized : `propiedades/${normalized}`;
+      
+      return `${supabaseUrl}/storage/v1/object/public/${finalPath}`;
+  }
+  return url;
+};
+
 export interface PropertyDB {
   id: string;
   title: string;
   price: number;
   location: string;
   type: string;
-  listing_type: string; // Map from DB column
+  listing_type: string; 
   beds: number;
   baths: number;
   sqft: number;
   image_url: string;
-  images: string[]; // Array of image URLs
+  images: string[]; 
   description: string;
   short_description: string;
-  features: any; // jsonb
+  features: any; 
   featured: boolean;
   is_published: boolean;
   status: string;
   agent_ids?: string[];
-  agent_notes?: any; // Changed from string to any for JSONB
-  created_at?: string;
-}
-
-export interface AgentDB {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role?: string;
-  avatar_url?: string;
+  agent_notes?: any; 
   created_at?: string;
 }
 
@@ -60,19 +71,19 @@ const mapProperty = (p: PropertyDB): Property => ({
   price: p.price,
   location: p.location,
   type: p.type as PropertyType,
-  listingType: (p.listing_type === 'rent' ? 'rent' : 'sale'), // Default to sale if null/undefined
+  listingType: (p.listing_type === 'rent' ? 'rent' : 'sale'),
   beds: p.beds,
   baths: p.baths,
   sqft: p.sqft,
-  image: p.image_url, // Map image_url to image for frontend compatibility
-  images: p.images || [], // Map gallery images
+  image: p.image_url, 
+  images: p.images || [], 
   description: p.description,
   shortDescription: p.short_description,
   features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features,
   featured: p.featured,
   status: p.status as PropertyStatus,
   isPublished: p.is_published,
-  agentIds: p.agent_ids || [], // Map array of agent IDs
+  agentIds: p.agent_ids || [], 
   agentNotes: p.agent_notes || []
 });
 
@@ -109,7 +120,6 @@ export const propertyService = {
       return [];
     }
 
-    // Since mapProperty already handles isPublished, we just return the mapped results
     return data.map((p) => mapProperty(p as PropertyDB));
   },
 
@@ -117,14 +127,30 @@ export const propertyService = {
   async getPropertyById(id: string): Promise<Property | null> {
     if (!supabase) return null;
 
+    // Check if id is a valid UUID to avoid Postgres error 400
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    
+    if (!uuidRegex.test(id)) {
+      console.warn(`ID "${id}" is not a valid UUID. Attempting fallback by slug/title...`);
+      const { data: fallbackData } = await supabase
+        .from('properties')
+        .select('*')
+        .ilike('title', `%${id.replace(/-/g, ' ')}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (fallbackData) return mapProperty(fallbackData as PropertyDB);
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('properties')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (error) {
-      console.error('Error fetching property:', error);
+    if (error || !data) {
+      if (error) console.error('Error fetching property:', error);
       return null;
     }
 
@@ -132,34 +158,32 @@ export const propertyService = {
   },
 
   // Create a new property
-  // isPublished lets admins publish directly or save as draft
   async createProperty(property: Omit<Property, 'id'>, isPublished: boolean = false): Promise<{ success: boolean; error?: any; data?: any }> {
-    if (!supabase) {
-      console.warn('Supabase not configured, cannot create property');
-      return { success: false, error: 'Supabase client not initialized' };
-    }
+    // Log the object being sent to the parent
+    console.log('[DEBUG] propertyToSave in handleSaveBtn:', property.title, 'image:', property.image);
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
 
-    // Convert frontend model to DB model
     const dbPayload = {
       title: property.title,
       price: property.price,
       location: property.location,
       type: property.type,
-      listing_type: property.listingType, // Save the listing type
+      listing_type: property.listingType,
       beds: property.beds,
       baths: property.baths,
       sqft: property.sqft,
-      image_url: property.image,
-      images: property.images, // Save gallery
+      image_url: ensureFullUrl(property.image || (property as any).image_url || ''),
+      images: (property.images || []).map(ensureFullUrl),
       description: property.description,
       short_description: property.shortDescription,
       features: property.features,
       featured: property.featured,
-      is_published: isPublished, // Draft vs Published
-      status: property.status || 'available',
-      agent_ids: property.agentIds || [], // Array of assigned agents
+      is_published: isPublished,
+      agent_ids: property.agentIds || [],
       agent_notes: property.agentNotes || []
     };
+
+    console.log('[DEBUG] supabase.ts: Final dbPayload for insert:', dbPayload.title, 'image_url:', dbPayload.image_url);
 
     const { data, error } = await supabase
       .from('properties')
@@ -190,7 +214,7 @@ export const propertyService = {
 
     return data.map((a: any) => ({
       ...a,
-      avatar: a.avatar_url,
+      avatar: a.avatar_url ? ensureFullUrl(a.avatar_url) : undefined,
     }));
   },
 
@@ -213,7 +237,7 @@ export const propertyService = {
       role: a.role,
       email: a.email,
       phone: a.phone,
-      avatar: a.avatar_url,
+      avatar: a.avatar_url ? ensureFullUrl(a.avatar_url) : undefined,
     }));
   },
 
@@ -265,22 +289,6 @@ export const propertyService = {
     return { success: true };
   },
 
-  // Delete an agent
-  async deleteAgent(id: string): Promise<{ success: boolean; error?: string }> {
-    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
-
-    const { error } = await supabase
-      .from('agents')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting agent:', error);
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  },
-
   // Upload Agent Avatar
   async uploadAgentAvatar(file: File): Promise<string | null> {
     if (!supabase) return null;
@@ -290,7 +298,7 @@ export const propertyService = {
 
     const { error: uploadError } = await supabase.storage
       .from('agents')
-      .upload(fileName, file);
+      .upload(fileName, file, { contentType: file.type, upsert: true });
 
     if (uploadError) {
       console.error('Error uploading agent avatar:', uploadError);
@@ -308,7 +316,6 @@ export const propertyService = {
   async updateProperty(id: string, updates: Partial<Property>): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
 
-    // Convert frontend model to DB model for the updates
     const dbUpdates: any = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;
     if (updates.price !== undefined) dbUpdates.price = updates.price;
@@ -318,8 +325,12 @@ export const propertyService = {
     if (updates.beds !== undefined) dbUpdates.beds = updates.beds;
     if (updates.baths !== undefined) dbUpdates.baths = updates.baths;
     if (updates.sqft !== undefined) dbUpdates.sqft = updates.sqft;
-    if (updates.image !== undefined) dbUpdates.image_url = updates.image;
-    if (updates.images !== undefined) dbUpdates.images = updates.images;
+    
+    if (updates.image !== undefined) dbUpdates.image_url = ensureFullUrl(updates.image);
+    else if ((updates as any).image_url !== undefined) dbUpdates.image_url = ensureFullUrl((updates as any).image_url);
+    
+    if (updates.images !== undefined) dbUpdates.images = (updates.images || []).map(ensureFullUrl);
+    
     if (updates.description !== undefined) dbUpdates.description = updates.description;
     if (updates.shortDescription !== undefined) dbUpdates.short_description = updates.shortDescription;
     if (updates.features !== undefined) dbUpdates.features = updates.features;
@@ -328,15 +339,25 @@ export const propertyService = {
     if (updates.agentIds !== undefined) dbUpdates.agent_ids = updates.agentIds || null;
     if (updates.agentNotes !== undefined) dbUpdates.agent_notes = updates.agentNotes;
 
-    const { error } = await supabase
+    console.log('[DEBUG] supabase.ts: Final dbUpdates for update:', id, 'image_url:', dbUpdates.image_url);
+
+    const { data, error } = await supabase
       .from('properties')
       .update(dbUpdates)
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
     if (error) {
       console.error('Error updating property:', error);
       return { success: false, error: error.message };
     }
+
+    if (!data || data.length === 0) {
+      console.warn('Update successful (204) but 0 rows affected. Check RLS or ID correctness.');
+      return { success: false, error: 'No se pudo actualizar la fila (posible error de permisos o ID)' };
+    }
+    
+    console.log('[DEBUG] Update successful, rows affected:', data.length);
     return { success: true };
   },
 
@@ -354,7 +375,6 @@ export const propertyService = {
       return { success: false, error: error.message };
     }
 
-    console.log(`Deletion attempt for ${id}: ${count} rows affected.`);
     return { success: true, count: count || 0 };
   },
 
@@ -364,85 +384,47 @@ export const propertyService = {
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const filePath = `${fileName}`; 
+
+    console.log('Uploading file to bucket "propiedades":', filePath);
 
     const { error: uploadError } = await supabase.storage
-      .from('properties')
-      .upload(filePath, file);
+      .from('propiedades') // Correct bucket name
+      .upload(filePath, file, { contentType: file.type, upsert: true });
 
     if (uploadError) {
-      console.error('Error uploading image:', uploadError);
+      console.error('Error uploading image to bucket "propiedades":', uploadError);
       return null;
     }
 
     const { data } = supabase.storage
-      .from('properties')
+      .from('propiedades') // Correct bucket name
       .getPublicUrl(filePath);
 
     return data.publicUrl;
   },
 
-  // CRM: Create a new lead from contact forms
-  async createLead(leadData: { name: string; email: string; phone: string; message: string; property_id?: string; agent_id?: string }): Promise<{ success: boolean; error?: string }> {
+  // CRM: Create lead
+  async createLead(leadData: any): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
-
-    const { error } = await supabase
-      .from('leads')
-      .insert([leadData]);
-
-    if (error) {
-      console.error('Error creating lead:', error);
-      return { success: false, error: error.message };
-    }
-
+    const { error } = await supabase.from('leads').insert([leadData]);
+    if (error) return { success: false, error: error.message };
     return { success: true };
   },
 
-  // CRM: Get all leads for admin dashboard
+  // CRM: Get leads
   async getLeads(): Promise<any[]> {
     if (!supabase) return [];
-
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching leads:', error);
-      return [];
-    }
+    const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+    if (error) return [];
     return data || [];
   },
 
   // CRM: Update lead status
   async updateLeadStatus(id: string, status: string): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
-
-    const { error } = await supabase
-      .from('leads')
-      .update({ status })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error updating lead status:', error);
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  },
-
-  // CRM: Update lead agent
-  async updateLeadAgent(id: string, agent_id: string): Promise<{ success: boolean; error?: string }> {
-    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
-
-    const { error } = await supabase
-      .from('leads')
-      .update({ agent_id })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error updating lead agent:', error);
-      return { success: false, error: error.message };
-    }
+    const { error } = await supabase.from('leads').update({ status }).eq('id', id);
+    if (error) return { success: false, error: error.message };
     return { success: true };
   }
 };
