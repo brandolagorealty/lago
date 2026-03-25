@@ -109,6 +109,7 @@ export type Translations = {
         schedule: string;
         contactAgent: string;
         officialAgent: string;
+        consultants: string;
     };
     footer: {
         description: string;

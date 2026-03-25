@@ -21,7 +21,14 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ mainImage, images = [], t
                 src={allImages[currentIndex] || mainImage}
                 alt={`${title} - View ${currentIndex + 1}`}
                 className="w-full h-full object-cover transition-all duration-500"
+                loading={currentIndex === 0 ? "eager" : "lazy"}
+                decoding="async"
             />
+            
+            {/* Preload next image */}
+            {allImages[(currentIndex + 1) % allImages.length] && (
+                <link rel="prefetch" href={allImages[(currentIndex + 1) % allImages.length]} />
+            )}
 
             {/* Controls */}
             {allImages.length > 1 && (

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Property, PropertyType, Agent, PropertyStatus } from '../types';
+import { Property, PropertyType, Agent, PropertyStatus, Lead, UserRole, UserRoleType, AuditLog } from '../types';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -116,10 +116,11 @@ export const propertyService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching admin properties:', error);
+      console.error('[ADMIN] Error fetching admin properties:', error);
       return [];
     }
 
+    console.log(`[ADMIN] getAdminProperties returned ${data?.length} rows. Published: ${data?.filter((p:any) => p.is_published).length}, Drafts: ${data?.filter((p:any) => !p.is_published).length}`);
     return data.map((p) => mapProperty(p as PropertyDB));
   },
 
@@ -215,6 +216,7 @@ export const propertyService = {
     return data.map((a: any) => ({
       ...a,
       avatar: a.avatar_url ? ensureFullUrl(a.avatar_url) : undefined,
+      bookingUrl: a.booking_url
     }));
   },
 
@@ -238,6 +240,7 @@ export const propertyService = {
       email: a.email,
       phone: a.phone,
       avatar: a.avatar_url ? ensureFullUrl(a.avatar_url) : undefined,
+      bookingUrl: a.booking_url
     }));
   },
 
@@ -250,7 +253,8 @@ export const propertyService = {
       role: agent.role,
       email: agent.email,
       phone: agent.phone || null,
-      avatar_url: agent.avatar
+      avatar_url: agent.avatar,
+      booking_url: agent.bookingUrl
     };
 
     const { data, error } = await supabase
@@ -276,6 +280,7 @@ export const propertyService = {
     if (updates.email !== undefined) dbUpdates.email = updates.email;
     if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
     if (updates.avatar !== undefined) dbUpdates.avatar_url = updates.avatar;
+    if (updates.bookingUrl !== undefined) dbUpdates.booking_url = updates.bookingUrl;
 
     const { error } = await supabase
       .from('agents')
@@ -284,6 +289,21 @@ export const propertyService = {
 
     if (error) {
       console.error('Error updating agent:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  },
+  
+  // Delete an agent
+  async deleteAgent(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase
+      .from('agents')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting agent:', error);
       return { success: false, error: error.message };
     }
     return { success: true };
@@ -338,6 +358,7 @@ export const propertyService = {
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.agentIds !== undefined) dbUpdates.agent_ids = updates.agentIds || null;
     if (updates.agentNotes !== undefined) dbUpdates.agent_notes = updates.agentNotes;
+    if (updates.isPublished !== undefined) dbUpdates.is_published = updates.isPublished;
 
     console.log('[DEBUG] supabase.ts: Final dbUpdates for update:', id, 'image_url:', dbUpdates.image_url);
 
@@ -426,5 +447,59 @@ export const propertyService = {
     const { error } = await supabase.from('leads').update({ status }).eq('id', id);
     if (error) return { success: false, error: error.message };
     return { success: true };
+  },
+
+  // SECURITY: Get the current user's own role via RPC (avoids recursive RLS)
+  async getMyRole(): Promise<string> {
+    if (!supabase) return 'asesor';
+    const { data, error } = await supabase.rpc('get_my_role');
+    if (error) {
+      console.warn('Could not fetch role via RPC, defaulting to asesor:', error);
+      return 'asesor';
+    }
+    return data || 'asesor';
+  },
+
+  // SECURITY: Get User Roles
+  async getUserRoles(): Promise<UserRole[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('user_roles').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching user roles:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  // SECURITY: Create or Update User Role
+  async manageUserRole(email: string, role: UserRoleType): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    
+    // Note: Inserting a user role requires the user_id if they already exist in auth.users,
+    // but the actual invite logic creates the auth.user first. 
+    // For now, if we create manually, we need to know the user_id.
+    // If we only have email, this needs an Edge Function to create the user securely.
+    // We will rely on the Edge function for creation, but this is the frontend placeholder.
+    return { success: false, error: 'Please use the Edge Function to invite users.' };
+  },
+
+  // SECURITY: Delete User Role
+  async deleteUserRole(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('user_roles').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  // SECURITY: Get Audit Logs
+  async getAuditLogs(): Promise<AuditLog[]> {
+    if (!supabase) return [];
+    // Only superadmin can read this table
+    const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) {
+      console.error('Error fetching audit logs:', error);
+      return [];
+    }
+    return data || [];
   }
 };

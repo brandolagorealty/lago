@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import PropertyForm from '../components/PropertyForm';
-import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus } from '../types';
+import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus, UserRole, AuditLog } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
@@ -28,7 +28,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({ isOpen, onClose
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 overflow-hidden">
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 overflow-hidden animate-in zoom-in duration-300">
                 <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
                 <div className="flex items-center justify-center w-16 h-16 bg-red-50 rounded-full mb-6 mx-auto">
                     <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -61,10 +61,14 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
     const [showForm, setShowForm] = useState(false);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'crm' | 'team'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'crm' | 'team' | 'seguridad' | 'auditoria'>('dashboard');
     const [properties, setProperties] = useState<Property[]>([]);
     const [agents, setAgents] = useState<Agent[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
+    const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+    const [currentUserRole, setCurrentUserRole] = useState<'superadmin' | 'asesor' | null>(null);
+
     const [isLoading, setIsLoading] = useState(true);
     const [agentFilter, setAgentFilter] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<PropertyStatus | 'all'>('all');
@@ -76,6 +80,11 @@ const Admin: React.FC = () => {
     const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
     const [showAgentForm, setShowAgentForm] = useState(false);
     const [isSavingAgent, setIsSavingAgent] = useState(false);
+
+    // Invite form state
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [isInviting, setIsInviting] = useState(false);
+    const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     // Cropper states
     const [cropImgSrc, setCropImgSrc] = useState<string>('');
@@ -97,14 +106,29 @@ const Admin: React.FC = () => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
+            // First, get the current user's role via a safe RPC function (avoids recursive RLS)
+            const myRole = await propertyService.getMyRole();
+            setCurrentUserRole(myRole as 'superadmin' | 'asesor');
+
+            // Fetch common data for all users
             const [propsData, agentsData, leadsData] = await Promise.all([
                 propertyService.getAdminProperties(),
                 propertyService.getAgents(),
-                propertyService.getLeads()
+                propertyService.getLeads(),
             ]);
             setProperties(propsData);
             setAgents(agentsData);
             setLeads(leadsData);
+
+            // Only fetch sensitive security data for superadmins
+            if (myRole === 'superadmin') {
+                const [rolesData, logsData] = await Promise.all([
+                    propertyService.getUserRoles(),
+                    propertyService.getAuditLogs()
+                ]);
+                setUserRoles(rolesData);
+                setAuditLogs(logsData);
+            }
         } catch (error) {
             console.error('Error fetching admin data:', error);
         }
@@ -116,14 +140,43 @@ const Admin: React.FC = () => {
         navigate('/login');
     };
 
+    const handleInviteUser = async () => {
+        if (!inviteEmail || !inviteEmail.includes('@')) {
+            setInviteResult({ type: 'error', message: 'Por favor ingresa un correo electrónico válido.' });
+            return;
+        }
+        setIsInviting(true);
+        setInviteResult(null);
+        try {
+            const { supabase: supabaseClient } = await import('../services/supabase');
+            const session = (await supabaseClient?.auth.getSession())?.data?.session;
+            const token = session?.access_token;
+            const response = await fetch('/.netlify/functions/invite-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ email: inviteEmail }),
+            });
+            const result = await response.json();
+            if (response.ok) {
+                setInviteResult({ type: 'success', message: `✅ Invitación enviada con éxito a ${inviteEmail}` });
+                setInviteEmail('');
+                fetchData(); // Refresh user roles list
+            } else {
+                setInviteResult({ type: 'error', message: `Error: ${result.error}` });
+            }
+        } catch {
+            setInviteResult({ type: 'error', message: 'Error de conexión. Verifica que el servidor esté activo.' });
+        }
+        setIsInviting(false);
+    };
+
     const handleSaveProperty = async (property: Property, isPublished: boolean = true) => {
         const isEditing = !!properties.find(p => p.id === property.id);
         let result;
 
         if (isEditing) {
-            // We pass is_published explicitly or keep it.
-            // propertyService.updateProperty maps to DB
-            result = await propertyService.updateProperty(property.id, property);
+            // Pass isPublished so that "Save as Draft" correctly sets is_published=false
+            result = await propertyService.updateProperty(property.id, { ...property, isPublished });
         } else {
             const { id, ...propertyData } = property;
             result = await propertyService.createProperty(propertyData, isPublished);
@@ -133,7 +186,10 @@ const Admin: React.FC = () => {
             await fetchData();
             setShowForm(false);
             setEditingProperty(null);
-            setToast({ message: isEditing ? 'Propiedad actualizada' : 'Propiedad creada', type: 'success' });
+            const msg = isPublished
+                ? (isEditing ? 'Propiedad publicada' : 'Propiedad publicada')
+                : (isEditing ? 'Borrador guardado' : 'Borrador creado');
+            setToast({ message: msg, type: 'success' });
         } else {
             alert('Error: ' + (result.error?.message || result.error));
         }
@@ -207,7 +263,8 @@ const Admin: React.FC = () => {
             role: (formData.get('role') as string),
             email: (formData.get('email') as string),
             phone: (formData.get('phone') as string),
-            avatar: (formData.get('avatar_url') as string)
+            avatar: (formData.get('avatar_url') as string),
+            bookingUrl: (formData.get('booking_url') as string)
         };
 
         let result;
@@ -306,7 +363,11 @@ const Admin: React.FC = () => {
     const filteredProperties = useMemo(() => {
         return properties.filter(p => {
             const matchesAgent = agentFilter ? p.agentIds?.includes(agentFilter) : true;
-            const matchesStatus = statusFilter !== 'all' ? p.status === statusFilter : true;
+            const matchesStatus = statusFilter === 'draft' 
+                ? !p.isPublished 
+                : statusFilter !== 'all' 
+                    ? p.status === statusFilter 
+                    : true;
             const matchesText = textFilter ?
                 (p.title.toLowerCase().includes(textFilter.toLowerCase()) ||
                     p.location.toLowerCase().includes(textFilter.toLowerCase())) : true;
@@ -488,8 +549,14 @@ const Admin: React.FC = () => {
                                     <button
                                         onClick={handleAddNote}
                                         disabled={isAddingNote || !newNote.trim()}
-                                        className="px-4 py-2 bg-brand-green text-white text-xs font-bold rounded-lg hover:shadow-lg disabled:opacity-50 transition-all"
+                                        className="px-4 py-2 bg-brand-green text-white text-xs font-bold rounded-lg hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center"
                                     >
+                                        {isAddingNote && (
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        )}
                                         {isAddingNote ? 'Guardando...' : 'Añadir Nota'}
                                     </button>
                                 </div>
@@ -551,20 +618,36 @@ const Admin: React.FC = () => {
                             onClick={() => setActiveTab('inventory')}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'inventory' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            Inventario Global
+                            Inventario
                         </button>
                         <button
                             onClick={() => setActiveTab('crm')}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'crm' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            CRM Prospectos
+                            CRM
                         </button>
                         <button
                             onClick={() => setActiveTab('team')}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            Equipo de Ventas
+                            Equipo
                         </button>
+                        {currentUserRole === 'superadmin' && (
+                            <>
+                                <button
+                                    onClick={() => setActiveTab('seguridad')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'seguridad' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Accesos
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('auditoria')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'auditoria' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Auditoría
+                                </button>
+                            </>
+                        )}
                     </div>
                     <div className="flex items-center gap-4 border-l border-slate-200 pl-6">
                         <span className="text-sm text-slate-500 hidden md:inline font-medium">Conectado como: {user?.email}</span>
@@ -723,6 +806,7 @@ const Admin: React.FC = () => {
                                     onChange={(e) => setStatusFilter(e.target.value as PropertyStatus | 'all')}
                                 >
                                     <option value="all">Todos los estados</option>
+                                                    <option value="draft">📝 Borradores</option>
                                     <option value="available">✨ Disponibles</option>
                                     <option value="reserved">⏳ Reservadas</option>
                                     <option value="sold">🎉 Vendidas</option>
@@ -829,6 +913,29 @@ const Admin: React.FC = () => {
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
                                                         <button
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                const newPublished = !property.isPublished;
+                                                                const result = await propertyService.updateProperty(property.id, { isPublished: newPublished });
+                                                                if (result.success) {
+                                                                    setProperties(prev => prev.map(p => p.id === property.id ? { ...p, isPublished: newPublished } : p));
+                                                                    setToast({ message: newPublished ? 'Propiedad publicada' : 'Movida a borradores', type: 'success' });
+                                                                }
+                                                            }}
+                                                            className={`p-2 transition-colors hover:bg-white rounded-full ${
+                                                                property.isPublished 
+                                                                    ? 'text-slate-400 hover:text-amber-500' 
+                                                                    : 'text-amber-500 hover:text-brand-green'
+                                                            }`}
+                                                            title={property.isPublished ? 'Mover a Borradores' : 'Publicar'}
+                                                        >
+                                                            {property.isPublished ? (
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                                            ) : (
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                            )}
+                                                        </button>
+                                                        <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 setEditingProperty(property);
@@ -838,16 +945,18 @@ const Admin: React.FC = () => {
                                                         >
                                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                         </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setPropertyToDelete(property);
-                                                            }}
-                                                            className="p-2 text-slate-400 hover:text-red-600 transition-colors hover:bg-white rounded-full"
-                                                            title="Eliminar"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                        </button>
+                                                        {currentUserRole === 'superadmin' && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setPropertyToDelete(property);
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-red-600 transition-colors hover:bg-white rounded-full"
+                                                                title="Eliminar"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -971,6 +1080,128 @@ const Admin: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'seguridad' && currentUserRole === 'superadmin' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div>
+                            <h1 className="text-3xl font-serif font-bold text-slate-900">Control de Accesos</h1>
+                            <p className="text-slate-500">Gestiona los permisos de los asesores en el sistema.</p>
+                        </div>
+                        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+                            <h2 className="text-xl font-bold text-slate-900 mb-6">Invitar Nuevo Asesor</h2>
+                            <p className="text-sm text-slate-500 mb-6">
+                                Introduce el correo corporativo del asesor. Le llegará un correo de bienvenida con el logo de Lago Realty y un enlace para establecer su contraseña.
+                            </p>
+                            <div className="flex gap-3 mb-4">
+                                <input
+                                    type="email"
+                                    placeholder="asesor@lagorealty.com.ve"
+                                    value={inviteEmail}
+                                    onChange={(e) => setInviteEmail(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleInviteUser()}
+                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20 text-sm font-medium"
+                                />
+                                <button
+                                    onClick={handleInviteUser}
+                                    disabled={isInviting || !inviteEmail}
+                                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                                >
+                                    {isInviting && (
+                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    )}
+                                    {isInviting ? 'Enviando...' : 'Enviar Invitación'}
+                                </button>
+                            </div>
+                            {inviteResult && (
+                                <div className={`p-4 rounded-xl text-sm font-medium ${inviteResult.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                    {inviteResult.message}
+                                </div>
+                            )}
+                            <div className="mt-8">
+                                <h2 className="text-xl font-bold text-slate-900 mb-4">Usuarios Activos en el Sistema</h2>
+                                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Email</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Rol</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha Ingreso</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {userRoles.map((role: UserRole) => (
+                                            <tr key={role.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-slate-900">{role.email}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${role.role === 'superadmin' ? 'bg-purple-100 text-purple-700' : 'bg-brand-green/10 text-brand-green'}`}>
+                                                        {role.role.toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-slate-500">{new Date(role.created_at).toLocaleDateString()}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
+                {activeTab === 'auditoria' && currentUserRole === 'superadmin' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div>
+                            <h1 className="text-3xl font-serif font-bold text-slate-900">Historial de Auditoría</h1>
+                            <p className="text-slate-500">Registro inalterable de cada cambio realizado en el inventario.</p>
+                        </div>
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Usuario</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Acción</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Propiedad ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                                    {auditLogs.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic">No hay registros de auditoría aún.</td>
+                                        </tr>
+                                    ) : (
+                                        auditLogs.map((log: AuditLog) => (
+                                            <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 text-sm text-slate-500">
+                                                    {new Date(log.created_at).toLocaleString()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-medium text-slate-900">{log.user_email || 'Sistema'}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                        log.action === 'INSERT' ? 'bg-green-100 text-green-700' : 
+                                                        log.action === 'UPDATE' ? 'bg-blue-100 text-blue-700' : 
+                                                        'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {log.action}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-xs font-mono text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={log.record_id}>
+                                                    {log.record_id}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </main>
 
             {(showForm || editingProperty) && (
@@ -981,6 +1212,7 @@ const Admin: React.FC = () => {
                         setEditingProperty(null);
                     }}
                     onSave={handleSaveProperty}
+                    userRole={currentUserRole || 'asesor'}
                 />
             )}
 
@@ -1064,7 +1296,22 @@ const Admin: React.FC = () => {
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" 
                                 />
                             </div>
-                            <button disabled={isSavingAgent} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Link de Reservas (Calendly/Google/Zoom)</label>
+                                <input 
+                                    name="booking_url" 
+                                    defaultValue={editingAgent?.bookingUrl} 
+                                    placeholder="https://calendly.com/..." 
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" 
+                                />
+                            </div>
+                            <button disabled={isSavingAgent} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center">
+                                {isSavingAgent && (
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )}
                                 {isSavingAgent ? 'Guardando...' : (editingAgent ? 'Guardar Cambios' : 'Registrar Asesor')}
                             </button>
                         </form>

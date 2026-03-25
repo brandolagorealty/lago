@@ -10,12 +10,13 @@ import PropertyDetails from './pages/PropertyDetails';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
+import LoadingScreen from './components/LoadingScreen';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <LoadingScreen />;
 
   if (!user) {
     return <Navigate to="/login" replace />;

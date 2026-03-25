@@ -18,6 +18,7 @@ export interface Agent {
   role: string;
   email: string;
   phone?: string;
+  bookingUrl?: string;
 }
 
 export interface PropertyNote {
@@ -70,5 +71,27 @@ export interface Lead {
   agent_id?: string;
   status: LeadStatus;
   notes?: any[]; // Reusing the JSON structure similar to agentNotes
+  created_at: string;
+}
+
+export type UserRoleType = 'superadmin' | 'asesor';
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  email: string;
+  role: UserRoleType;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  user_email: string;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  table_name: string;
+  record_id: string;
+  old_data?: any;
+  new_data?: any;
   created_at: string;
 }

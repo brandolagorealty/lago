@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invitación al Sistema de Gestión | Lago Realty</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #f1f5f9; font-family: 'Georgia', serif; }
+        .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 30px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3d32 100%); padding: 50px 40px; text-align: center; }
+        .logo { font-size: 28px; font-weight: 900; color: #ffffff; letter-spacing: 0.15em; text-transform: uppercase; }
+        .logo span { color: #1ec381; }
+        .logo-subtitle { color: rgba(255,255,255,0.5); font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; margin-top: 4px; font-family: Arial, sans-serif; font-weight: 400; }
+        .header-line { width: 50px; height: 2px; background: #1ec381; margin: 20px auto; }
+        .header-text { color: rgba(255,255,255,0.85); font-size: 13px; letter-spacing: 0.05em; font-family: Arial, sans-serif; font-weight: 300; }
+        .body { padding: 48px 48px 40px; }
+        .greeting { font-size: 24px; color: #0f172a; margin-bottom: 20px; line-height: 1.3; font-weight: 700; }
+        .paragraph { font-size: 15px; color: #475569; line-height: 1.8; margin-bottom: 20px; font-family: Arial, sans-serif; font-weight: 300; }
+        .feature-box { background: #f8fafc; border-left: 3px solid #1ec381; border-radius: 0 12px 12px 0; padding: 20px 24px; margin: 30px 0; }
+        .feature-box p { font-size: 14px; color: #334155; font-family: Arial, sans-serif; line-height: 1.7; }
+        .feature-box ul { padding-left: 18px; margin-top: 10px; }
+        .feature-box li { font-size: 14px; color: #475569; font-family: Arial, sans-serif; line-height: 1.9; }
+        .cta-container { text-align: center; margin: 40px 0; }
+        .cta-button { display: inline-block; background: #0f172a; color: #ffffff !important; text-decoration: none; padding: 18px 44px; border-radius: 50px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; transition: all 0.2s; }
+        .cta-button:hover { background: #1e293b; }
+        .expiry-note { text-align: center; font-size: 12px; color: #94a3b8; font-family: Arial, sans-serif; margin-top: 12px; }
+        .divider { border: none; border-top: 1px solid #e2e8f0; margin: 30px 0; }
+        .footer { background: #f8fafc; padding: 30px 48px; }
+        .footer-logo { font-size: 14px; font-weight: 700; color: #94a3b8; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 12px; font-family: Arial, sans-serif; }
+        .footer-text { font-size: 11px; color: #94a3b8; line-height: 1.7; font-family: Arial, sans-serif; font-weight: 300; }
+        .footer-site { color: #1ec381; font-weight: 600; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo">LAGO<span>.</span></div>
+            <div class="logo-subtitle">Realty</div>
+            <div class="header-line"></div>
+            <div class="header-text">Sistema de Gestión de Propiedades</div>
+        </div>
+
+        <!-- BODY -->
+        <div class="body">
+            <div class="greeting">Bienvenido al equipo, {{ .Email }}</div>
+
+            <p class="paragraph">
+                Has sido invitado a formar parte del equipo de asesores de <strong>Lago Realty</strong>. 
+                A partir de ahora, tendrás acceso a nuestro sistema de gestión de inventario de propiedades, 
+                una plataforma diseñada para que puedas administrar y publicar tus listados directamente 
+                en el sitio oficial <strong>lagorealty.com.ve</strong>.
+            </p>
+
+            <div class="feature-box">
+                <p><strong>Con tu acceso podrás:</strong></p>
+                <ul>
+                    <li>Registrar nuevas propiedades como borradores</li>
+                    <li>Adjuntar fotografías, descripciones y precio</li>
+                    <li>Gestionar el estatus de tus propiedades asignadas</li>
+                    <li>Hacer seguimiento de prospectos interesados</li>
+                </ul>
+            </div>
+
+            <p class="paragraph">
+                Para comenzar, haz clic en el botón a continuación. Serás dirigido a una página segura donde 
+                podrás establecer tu contraseña personal. Una vez activa tu cuenta, podrás iniciar sesión en 
+                cualquier momento desde el panel de control.
+            </p>
+
+            <div class="cta-container">
+                <a href="{{ .ConfirmationURL }}" class="cta-button">Activar mi cuenta</a>
+                <div class="expiry-note">Este enlace expirará en 24 horas por tu seguridad.</div>
+            </div>
+
+            <hr class="divider" />
+
+            <p class="paragraph" style="font-size: 13px; color: #94a3b8;">
+                Si no esperabas este correo o crees que fue enviado por error, puedes ignorarlo con tranquilidad. 
+                Tu cuenta solo se activará si haces clic en el botón de arriba.
+            </p>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <div class="footer-logo">LAGO REALTY</div>
+            <div class="footer-text">
+                © 2025 Lago Realty. Todos los derechos reservados.<br />
+                Sitio web: <a href="https://lagorealty.com.ve" class="footer-site">lagorealty.com.ve</a><br /><br />
+                Este mensaje fue enviado automáticamente por el sistema de gestión interno de Lago Realty.
+                Por favor, no respondas directamente a este correo.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

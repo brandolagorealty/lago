@@ -123,6 +123,7 @@ export const es: Translations = {
         schedule: 'Programar Visita',
         contactAgent: 'Contactar Agente',
         officialAgent: 'Agente de Listado Oficial',
+        consultants: 'Consultores Inmobiliarios',
     },
     footer: {
         description: 'Líderes en el mercado inmobiliario del Zulia, ofreciendo las propiedades más exclusivas y un servicio de clase mundial.',

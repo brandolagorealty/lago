@@ -142,7 +142,7 @@ const Home: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-brand-white">
+        <div className="min-h-screen bg-brand-white animate-fade-in">
             {/* Navbar updated to not show List Property button in public view */}
             <Navbar currentView={currentView} onNavigate={setCurrentView} onOpenForm={() => { }} />
 
