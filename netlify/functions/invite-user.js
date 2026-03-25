@@ -49,7 +49,7 @@ exports.handler = async (event) => {
 
     // All checks passed — invite the user using the Supabase Admin API
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${process.env.URL}/admin`, // Netlify automatically sets the URL env var
+        redirectTo: `${process.env.URL}/reset-password`, // Redirect to the new password setup page
     });
 
     if (inviteError) {

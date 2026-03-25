@@ -10,6 +10,7 @@ import PropertyDetails from './pages/PropertyDetails';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Contact from './pages/Contact';
+import ResetPassword from './pages/ResetPassword';
 import LoadingScreen from './components/LoadingScreen';
 
 // Protected Route Component
@@ -37,6 +38,7 @@ const App: React.FC = () => {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               path="/admin"
               element={
