@@ -30,7 +30,7 @@ exports.handler = async (event) => {
     const { data: { user: callerUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
     if (authError || !callerUser) {
-        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Invalid token.' }) };
+        return { statusCode: 401, body: JSON.stringify({ error: `Unauthorized: Invalid token. Details: ${authError?.message || 'User not found in token'}` }) };
     }
 
     const { data: roleData, error: roleError } = await supabaseAdmin
