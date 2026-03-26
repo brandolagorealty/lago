@@ -483,11 +483,45 @@ export const propertyService = {
     return { success: false, error: 'Please use the Edge Function to invite users.' };
   },
 
-  // SECURITY: Delete User Role
-  async deleteUserRole(id: string): Promise<{ success: boolean; error?: string }> {
+  // SECURITY: Delete Auth User via Edge Function
+  async deleteAuthUser(userId: string): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
-    const { error } = await supabase.from('user_roles').delete().eq('id', id);
-    if (error) return { success: false, error: error.message };
+    
+    // Auth token needed to verify superadmin status in backend
+    const sessionResult = await supabase.auth.getSession();
+    const token = sessionResult?.data?.session?.access_token;
+    if (!token) return { success: false, error: 'Not authenticated' };
+
+    try {
+        const response = await fetch('/.netlify/functions/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ userId }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+            return { success: true };
+        } else {
+            return { success: false, error: result.error || 'Server error' };
+        }
+    } catch (e: any) {
+        return { success: false, error: e.message || 'Connection error' };
+    }
+  },
+
+  // SECURITY: Promote User to Superadmin
+  async promoteUser(rowId: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    
+    const { error } = await supabase
+        .from('user_roles')
+        .update({ role: 'superadmin' })
+        .eq('id', rowId);
+
+    if (error) {
+        console.error('Error promoting user:', error);
+        return { success: false, error: error.message };
+    }
     return { success: true };
   },
 

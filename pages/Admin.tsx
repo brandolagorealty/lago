@@ -592,73 +592,92 @@ const Admin: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col animate-in fade-in duration-500">
-            <nav className="bg-white border-b border-slate-200 px-6 py-2 flex justify-between items-center sticky top-0 z-40">
-                <div
-                    className="flex items-center gap-3 cursor-pointer"
+        <div className="min-h-screen bg-[#EFEFEF] flex animate-in fade-in duration-500 overflow-x-hidden">
+            {/* Sidebar */}
+            <aside className="w-64 bg-[#1A1A1A] border-r border-white/5 flex flex-col fixed h-screen z-50 text-[#EFEFEF]/70 shadow-2xl">
+                <div 
+                    className="h-20 flex items-center px-6 gap-3 border-b border-white/5 cursor-pointer shrink-0"
                     onClick={() => {
                         setActiveTab('inventory');
                         setAgentFilter(null);
                         setSelectedProperty(null);
                     }}
                 >
-                    <img src="/assets/logo.png" alt="Lago Realty" className="h-14 w-auto object-contain" />
-                    <div className="h-8 w-[1px] bg-slate-200"></div>
-                    <span className="text-lg font-bold text-slate-900 uppercase tracking-tighter">Panel de Control</span>
+                    <img src="/assets/logo.png" alt="Lago Hub" className="h-8 w-auto object-contain brightness-0 invert" />
+                    <span className="text-lg font-bold text-[#EFEFEF] uppercase tracking-tighter">Lago Hub</span>
                 </div>
-                <div className="flex items-center gap-6">
-                    <div className="flex bg-slate-100 p-1 rounded-xl">
-                        <button
-                            onClick={() => setActiveTab('dashboard')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Dashboard
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('inventory')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'inventory' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Inventario
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('crm')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'crm' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            CRM
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('team')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Equipo
-                        </button>
-                        {currentUserRole === 'superadmin' && (
-                            <>
-                                <button
-                                    onClick={() => setActiveTab('seguridad')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'seguridad' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Accesos
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('auditoria')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'auditoria' ? 'bg-white shadow-sm text-brand-green translate-y-[-1px]' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Auditoría
-                                </button>
-                            </>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-4 border-l border-slate-200 pl-6">
-                        <span className="text-sm text-slate-500 hidden md:inline font-medium">Conectado como: {user?.email}</span>
-                        <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Cerrar Sesión">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                        </button>
-                    </div>
-                </div>
-            </nav>
+                
+                <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
+                    <p className="px-4 text-[10px] font-bold text-[#EFEFEF]/40 uppercase tracking-widest mb-2 mt-2">Gestión</p>
+                    <button
+                        onClick={() => setActiveTab('dashboard')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'dashboard' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                    >
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        Dashboard
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('inventory')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'inventory' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                    >
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                        Inventario
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('crm')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'crm' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                    >
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        CRM
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('team')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'team' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                    >
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        Equipo
+                    </button>
 
-            <main className="flex-grow max-w-7xl w-full mx-auto px-6 py-8">
+                    {currentUserRole === 'superadmin' && (
+                        <>
+                            <p className="px-4 text-[10px] font-bold text-[#EFEFEF]/40 uppercase tracking-widest mb-2 mt-8">Administración</p>
+                            <button
+                                onClick={() => setActiveTab('seguridad')}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'seguridad' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                            >
+                                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                Accesos
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('auditoria')}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'auditoria' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                            >
+                                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2v1M12 12h.01M12 16h.01M16 12h.01M16 16h.01" /></svg>
+                                Auditoría
+                            </button>
+                        </>
+                    )}
+                </nav>
+
+                <div className="p-4 border-t border-white/5 shrink-0">
+                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl">
+                        <div className="w-8 h-8 rounded-full bg-[#88C3D8] flex items-center justify-center text-[#1A1A1A] font-extrabold text-xs shrink-0 shadow-inner">
+                            {user?.email?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-[#EFEFEF] truncate">{user?.email?.split('@')[0]}</p>
+                            <p className="text-[10px] text-[#88C3D8] uppercase font-bold truncate tracking-widest">{currentUserRole || 'Asesor'}</p>
+                        </div>
+                        <button onClick={handleLogout} className="p-2 text-[#EFEFEF]/50 hover:text-red-400 hover:bg-white/5 rounded-xl transition-colors shrink-0" title="Cerrar Sesión">
+                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <div className="flex-1 ml-64 flex flex-col min-w-0 transition-all duration-300">
+                <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-8 md:px-10">
                 {activeTab === 'dashboard' && (
                     <div className="space-y-6 animate-fade-in">
                         <div>
@@ -1129,6 +1148,7 @@ const Admin: React.FC = () => {
                                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Email</th>
                                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Rol</th>
                                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha Ingreso</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1141,6 +1161,51 @@ const Admin: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-slate-500">{new Date(role.created_at).toLocaleDateString()}</td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {role.role !== 'superadmin' && (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm(`¿Estás seguro de promover a ${role.email} a SUPERADMIN? Esta acción no se puede deshacer desde aquí.`)) return;
+                                                                    setToast({ message: 'Promoviendo...', type: 'success' });
+                                                                    const res = await propertyService.promoteUser(role.id);
+                                                                    if (res.success) {
+                                                                        setToast({ message: 'Promovido a Superadmin', type: 'success' });
+                                                                        fetchData();
+                                                                    } else {
+                                                                        setToast({ message: 'Error al promover: ' + res.error, type: 'error' });
+                                                                    }
+                                                                }}
+                                                                className="px-3 py-1 text-xs font-bold text-brand-green border border-brand-green/30 hover:bg-brand-green hover:text-white rounded-lg transition-colors"
+                                                                title="Promover a Superadmin"
+                                                            >
+                                                                Promover
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    const userId = (role as any).user_id;
+                                                                    if (!userId) {
+                                                                        setToast({ message: 'Este usuario no tiene un ID asociado', type: 'error' });
+                                                                        return;
+                                                                    }
+                                                                    if (!confirm(`¿Estás seguro de ELIMINAR a ${role.email}?`)) return;
+                                                                    setToast({ message: 'Eliminando...', type: 'success' });
+                                                                    const res = await propertyService.deleteAuthUser(userId);
+                                                                    if (res.success) {
+                                                                        setToast({ message: 'Usuario eliminado exitosamente', type: 'success' });
+                                                                        fetchData();
+                                                                    } else {
+                                                                        setToast({ message: 'Error al eliminar: ' + res.error, type: 'error' });
+                                                                    }
+                                                                }}
+                                                                className="px-3 py-1 text-xs font-bold text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
+                                                                title="Eliminar Asesor"
+                                                            >
+                                                                Eliminar
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1203,6 +1268,7 @@ const Admin: React.FC = () => {
                     </div>
                 )}
             </main>
+            </div>
 
             {(showForm || editingProperty) && (
                 <PropertyForm

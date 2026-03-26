@@ -62,13 +62,12 @@ const ResetPassword = () => {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             {/* Logo */}
-            <div className="mb-10 text-center">
-                <div className="text-3xl font-black text-slate-900 tracking-widest uppercase">
-                    LAGO<span className="text-brand-green">.</span>
-                </div>
-                <div className="text-[10px] text-slate-400 tracking-[0.3em] uppercase mt-1">
-                    Realty
-                </div>
+            <div className="mb-10 flex justify-center">
+                <img 
+                    src="https://scdztnzkzrvjgyefunkw.supabase.co/storage/v1/object/public/assets/MANUAL%20DE%20IDENTIDAD%20LAGO%20READY-09.jpg" 
+                    alt="Lago Realty Logo" 
+                    className="h-20 w-auto object-contain"
+                />
             </div>
 
             <div className="bg-white rounded-3xl p-10 shadow-xl shadow-slate-200/50 w-full max-w-md border border-slate-100">

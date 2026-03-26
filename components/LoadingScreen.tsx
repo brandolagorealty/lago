@@ -7,10 +7,12 @@ const LoadingScreen: React.FC = () => {
         {/* Animated Brand Logo/Initial */}
         <div className="relative w-24 h-24 mb-6">
           <div className="absolute inset-0 bg-brand-green/20 rounded-full animate-ping"></div>
-          <div className="absolute inset-2 bg-brand-white rounded-full flex items-center justify-center shadow-lg border-2 border-brand-green/30 z-10">
-            <span className="font-serif text-3xl font-black text-brand-black tracking-tighter">
-              LAGO
-            </span>
+          <div className="absolute inset-2 bg-brand-white rounded-full flex items-center justify-center shadow-lg border-2 border-brand-green/30 z-10 overflow-hidden">
+            <img 
+              src="https://scdztnzkzrvjgyefunkw.supabase.co/storage/v1/object/public/assets/MANUAL%20DE%20IDENTIDAD%20LAGO%20READY-16.jpg" 
+              alt="Lago Realty Logo" 
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
         
