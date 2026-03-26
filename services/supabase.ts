@@ -509,20 +509,30 @@ export const propertyService = {
     }
   },
 
-  // SECURITY: Promote User to Superadmin
+  // SECURITY: Promote User to Superadmin via Edge Function
   async promoteUser(rowId: string): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
     
-    const { error } = await supabase
-        .from('user_roles')
-        .update({ role: 'superadmin' })
-        .eq('id', rowId);
+    // Auth token needed to verify superadmin status in backend
+    const sessionResult = await supabase.auth.getSession();
+    const token = sessionResult?.data?.session?.access_token;
+    if (!token) return { success: false, error: 'Not authenticated' };
 
-    if (error) {
-        console.error('Error promoting user:', error);
-        return { success: false, error: error.message };
+    try {
+        const response = await fetch('/.netlify/functions/promote-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ roleId: rowId }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+            return { success: true };
+        } else {
+            return { success: false, error: result.error || 'Server error' };
+        }
+    } catch (e: any) {
+        return { success: false, error: e.message || 'Connection error' };
     }
-    return { success: true };
   },
 
   // SECURITY: Get Audit Logs
