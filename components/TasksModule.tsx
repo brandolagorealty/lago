@@ -197,10 +197,14 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 setIsModalOpen(false);
                 setTaskToDelete(null);
             } else {
-                setDeleteError(error || "Revise los permisos RLS en Supabase.");
+                const errMsg = error || "Revise los permisos RLS en Supabase o inicie sesión nuevamente.";
+                setDeleteError(errMsg);
+                alert("⚠ Fallo la Eliminación: " + errMsg);
             }
         } catch (err: any) {
-            setDeleteError(err.message || "Error inesperado al eliminar.");
+            const throwMsg = err.message || "Error inesperado al eliminar.";
+            setDeleteError(throwMsg);
+            alert("⚠ Error de Servidor: " + throwMsg);
         } finally {
             setIsDeleting(false);
         }
@@ -331,10 +335,11 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                                 <div className="flex items-center gap-2">
                                                     {(currentUserRole === 'superadmin' || task.assignor_id === currentUserId) && (
                                                         <button 
-                                                            onClick={(e) => {
+                                                            onPointerDown={(e) => {
                                                                 e.stopPropagation();
-                                                                handleDeleteTask(task.id);
+                                                                confirmDeleteTask(task);
                                                             }}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             className="text-slate-400 hover:text-[#EFEFEF] hover:bg-[#1a1a1a] p-1.5 rounded-md transition-colors border border-transparent hover:border-[#1a1a1a]"
                                                             title="Eliminar tarea"
                                                         >
