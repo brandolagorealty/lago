@@ -27,11 +27,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Check active sessions and sets the user
         // If supabase is null (offline mode), this will just fail gracefully or needs check
         if (!supabase) {
+            console.warn('[DEBUG] Supabase client is null. Offline mode?');
             setLoading(false);
             return;
         }
 
+        console.log('[DEBUG] AuthProvider: Fetching session...');
         supabase.auth.getSession().then(({ data: { session } }) => {
+            console.log('[DEBUG] AuthProvider: Session fetched:', session ? 'Found' : 'Not found');
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);

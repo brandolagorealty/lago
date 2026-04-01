@@ -77,6 +77,8 @@ export type Translations = {
         };
         submit: string;
         submitting: string;
+        save: string;
+        update: string;
         successTitle: string;
         successMessage: string;
         errorTitle: string;

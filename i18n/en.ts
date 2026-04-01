@@ -91,6 +91,8 @@ export const en: Translations = {
         },
         submit: 'Publish Listing',
         submitting: 'Submitting...',
+        save: 'Publish Listing',
+        update: 'Save Changes',
         successTitle: 'Thank you!',
         successMessage: 'Your property has been submitted for review and will be listed pending approval.',
         errorTitle: 'Error saving property',
@@ -123,6 +125,7 @@ export const en: Translations = {
         schedule: 'Schedule Viewing',
         contactAgent: 'Contact Agent',
         officialAgent: 'Official Listing Agent',
+        consultants: 'Real Estate Consultants',
     },
     footer: {
         description: 'Leaders in the Zulia real estate market, offering the most exclusive properties and world-class service.',

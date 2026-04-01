@@ -80,6 +80,7 @@ const Admin: React.FC = () => {
     const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
     const [showAgentForm, setShowAgentForm] = useState(false);
     const [isSavingAgent, setIsSavingAgent] = useState(false);
+    const [agentAvatarUrl, setAgentAvatarUrl] = useState<string>('');
 
     // Invite form state
     const [inviteEmail, setInviteEmail] = useState('');
@@ -107,7 +108,9 @@ const Admin: React.FC = () => {
         setIsLoading(true);
         try {
             // First, get the current user's role via a safe RPC function (avoids recursive RLS)
+            console.log('[DEBUG] Admin: Fetching role via RPC...');
             const myRole = await propertyService.getMyRole();
+            console.log('[DEBUG] Admin: Role fetched:', myRole);
             setCurrentUserRole(myRole as 'superadmin' | 'asesor');
 
             // Fetch common data for all users
@@ -263,7 +266,9 @@ const Admin: React.FC = () => {
             role: (formData.get('role') as string),
             email: (formData.get('email') as string),
             phone: (formData.get('phone') as string),
-            avatar: (formData.get('avatar_url') as string),
+            // Use controlled state for avatar — FormData can't track imperatively-set .value
+            // Use null (not empty string) when no avatar so Supabase doesn't reject with 400
+            avatar: agentAvatarUrl || (formData.get('avatar_url') as string) || null,
             bookingUrl: (formData.get('booking_url') as string)
         };
 
@@ -278,6 +283,7 @@ const Admin: React.FC = () => {
             await fetchData();
             setShowAgentForm(false);
             setEditingAgent(null);
+            setAgentAvatarUrl('');
             setToast({ message: editingAgent ? 'Asesor actualizado' : 'Asesor agregado', type: 'success' });
         } else {
             alert('Error: ' + result.error);
@@ -342,20 +348,12 @@ const Admin: React.FC = () => {
             const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
             const url = await propertyService.uploadAgentAvatar(file);
             if (url) {
-                // Find input by name or use a better way
-                const form = document.querySelector('form') as HTMLFormElement;
-                if (form) {
-                    const avatarInput = form.querySelector('input[name="avatar_url"]') as HTMLInputElement;
-                    if (avatarInput) {
-                        avatarInput.value = url;
-                        // Trigger an input event so any listeners would know (though not strictly needed for FormData)
-                        avatarInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                }
-                setToast({ message: 'Foto subida con éxito', type: 'success' });
+                // Use React state — this is the reliable way to pass the URL to handleSaveAgent
+                setAgentAvatarUrl(url);
+                setToast({ message: '✅ Foto subida con éxito', type: 'success' });
                 setCropImgSrc('');
             } else {
-                setToast({ message: 'Error al subir foto', type: 'error' });
+                setToast({ message: 'Error al subir foto. Revisa la consola.', type: 'error' });
             }
         }, 'image/jpeg', 0.95);
     };
@@ -872,7 +870,14 @@ const Admin: React.FC = () => {
                                                             )}
                                                         </div>
                                                         <div className="max-w-[200px]">
-                                                            <p className="font-bold text-slate-900 leading-tight truncate">{property.title}</p>
+                                                            <p
+                                                                className="font-bold text-slate-900 leading-tight truncate hover:text-brand-green hover:underline cursor-pointer transition-colors"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingProperty(property);
+                                                                }}
+                                                                title="Clic para editar"
+                                                            >{property.title}</p>
                                                             <p className="text-xs text-slate-400">{property.location}</p>
                                                             {property.agentNotes && property.agentNotes.length > 0 && (
                                                                 <div className="mt-1 flex items-center gap-1 text-[10px] text-brand-green font-bold">
@@ -997,6 +1002,7 @@ const Admin: React.FC = () => {
                             <button
                                 onClick={() => {
                                     setEditingAgent(null);
+                                    setAgentAvatarUrl('');
                                     setShowAgentForm(true);
                                 }}
                                 className="px-6 py-3 bg-brand-green text-white rounded-2xl font-bold shadow-lg shadow-brand-green/20 hover:scale-105 transition-all flex items-center gap-2"
@@ -1023,7 +1029,9 @@ const Admin: React.FC = () => {
                                                 <div className="flex gap-1">
                                                     <button
                                                         onClick={() => {
-                                                            setEditingAgent(agents.find(a => a.id === agent.id) || null);
+                                                            const a = agents.find(a => a.id === agent.id) || null;
+                                                            setEditingAgent(a);
+                                                            setAgentAvatarUrl(a?.avatar || '');
                                                             setShowAgentForm(true);
                                                         }}
                                                         className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
@@ -1315,14 +1323,14 @@ const Admin: React.FC = () => {
             {/* Agent Form Modal */}
             {showAgentForm && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAgentForm(false)}></div>
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowAgentForm(false); setAgentAvatarUrl(''); }}></div>
                     <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-300">
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
                                 <h2 className="text-2xl font-serif font-bold text-slate-900">{editingAgent ? 'Editar Asesor' : 'Agregar Asesor'}</h2>
                                 <p className="text-slate-500 text-sm">Gestiona la información del miembro de tu equipo.</p>
                             </div>
-                            <button onClick={() => setShowAgentForm(false)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400">
+                            <button onClick={() => { setShowAgentForm(false); setAgentAvatarUrl(''); }} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
@@ -1349,18 +1357,25 @@ const Admin: React.FC = () => {
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">URL de Foto (Avatar)</label>
-                                    <label className="text-xs font-bold text-brand-green hover:underline cursor-pointer uppercase tracking-widest">
-                                        Seleccionar Foto
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Foto del Asesor</label>
+                                    <label className="text-xs font-bold text-brand-green hover:underline cursor-pointer uppercase tracking-widest flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                        Subir desde PC
                                         <input type="file" className="hidden" accept="image/*" onChange={onSelectFile} />
                                     </label>
                                 </div>
                                 <input 
-                                    name="avatar_url" 
-                                    defaultValue={editingAgent?.avatar} 
-                                    placeholder="https://..." 
+                                    name="avatar_url"
+                                    value={agentAvatarUrl}
+                                    onChange={e => setAgentAvatarUrl(e.target.value)}
+                                    placeholder="https://... o sube una foto desde tu PC" 
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" 
                                 />
+                                {agentAvatarUrl && (
+                                    <div className="relative h-24 w-24 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+                                        <img src={agentAvatarUrl} alt="Preview" className="w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display='none'; }} />
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Link de Reservas (Calendly/Google/Zoom)</label>

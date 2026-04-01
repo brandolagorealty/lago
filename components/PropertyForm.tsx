@@ -489,7 +489,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
               type="button"
               onClick={() => handleSaveBtn(false)}
               disabled={isSubmitting}
-              className="flex-1 bg-white text-slate-900 border border-slate-200 py-4 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="flex-1 bg-white text-[#1A1A1A] border-2 border-[#1A1A1A] py-4 rounded-xl font-bold hover:bg-[#f5f5f5] transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isSubmitting && (
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -504,7 +504,8 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
                 type="button"
                 onClick={() => handleSaveBtn(true)}
                 disabled={isSubmitting}
-                className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className="flex-1 bg-[#1A1A1A] border-2 border-[#1A1A1A] py-4 rounded-xl font-bold hover:bg-[#2a2a2a] transition-all shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                style={{ color: '#EFEFEF' }}
                 >
                 {isSubmitting && (
                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

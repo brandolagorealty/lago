@@ -279,7 +279,7 @@ export const propertyService = {
     if (updates.role !== undefined) dbUpdates.role = updates.role;
     if (updates.email !== undefined) dbUpdates.email = updates.email;
     if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-    if (updates.avatar !== undefined) dbUpdates.avatar_url = updates.avatar;
+    if (updates.avatar !== undefined && updates.avatar !== '') dbUpdates.avatar_url = updates.avatar || null;
     if (updates.bookingUrl !== undefined) dbUpdates.booking_url = updates.bookingUrl;
 
     const { error } = await supabase
@@ -307,29 +307,6 @@ export const propertyService = {
       return { success: false, error: error.message };
     }
     return { success: true };
-  },
-
-  // Upload Agent Avatar
-  async uploadAgentAvatar(file: File): Promise<string | null> {
-    if (!supabase) return null;
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `agent_${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('agents')
-      .upload(fileName, file, { contentType: file.type, upsert: true });
-
-    if (uploadError) {
-      console.error('Error uploading agent avatar:', uploadError);
-      return null;
-    }
-
-    const { data } = supabase.storage
-      .from('agents')
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
   },
 
   // Update property
@@ -399,29 +376,58 @@ export const propertyService = {
     return { success: true, count: count || 0 };
   },
 
-  // Upload image to Storage
+  // Upload image to Storage (properties bucket)
   async uploadImage(file: File): Promise<string | null> {
     if (!supabase) return null;
 
-    const fileExt = file.name.split('.').pop();
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`; 
 
-    console.log('Uploading file to bucket "propiedades":', filePath);
+    console.log('Uploading file to bucket "propiedades":', fileName);
 
     const { error: uploadError } = await supabase.storage
-      .from('propiedades') // Correct bucket name
-      .upload(filePath, file, { contentType: file.type, upsert: true });
+      .from('propiedades')
+      .upload(fileName, file, { contentType: file.type, upsert: true });
 
     if (uploadError) {
-      console.error('Error uploading image to bucket "propiedades":', uploadError);
+      console.error('Error uploading to "propiedades":', uploadError.message);
       return null;
     }
 
-    const { data } = supabase.storage
-      .from('propiedades') // Correct bucket name
-      .getPublicUrl(filePath);
+    const { data } = supabase.storage.from('propiedades').getPublicUrl(fileName);
+    return data.publicUrl;
+  },
 
+  // Upload agent avatar to Storage (agents bucket)
+  async uploadAgentAvatar(file: File): Promise<string | null> {
+    if (!supabase) return null;
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `avatar_${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+
+    console.log('Uploading agent avatar to bucket "agents":', fileName);
+
+    const { error: uploadError } = await supabase.storage
+      .from('agents')
+      .upload(fileName, file, { contentType: file.type, upsert: true });
+
+    if (uploadError) {
+      console.error('Error uploading to "agents" bucket:', uploadError.message);
+      // Fallback: try uploading to 'propiedades' bucket under agents/ folder
+      console.log('Retrying with propiedades/agents/ path...');
+      const fallbackPath = `agents/${fileName}`;
+      const { error: fallbackError } = await supabase.storage
+        .from('propiedades')
+        .upload(fallbackPath, file, { contentType: file.type, upsert: true });
+      if (fallbackError) {
+        console.error('Fallback also failed:', fallbackError.message);
+        return null;
+      }
+      const { data: fallbackData } = supabase.storage.from('propiedades').getPublicUrl(fallbackPath);
+      return fallbackData.publicUrl;
+    }
+
+    const { data } = supabase.storage.from('agents').getPublicUrl(fileName);
     return data.publicUrl;
   },
 

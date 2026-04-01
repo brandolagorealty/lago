@@ -91,6 +91,8 @@ export const es: Translations = {
         },
         submit: 'Publicar Listado',
         submitting: 'Enviando...',
+        save: 'Publicar Propiedad',
+        update: 'Guardar Cambios',
         successTitle: '¡Gracias!',
         successMessage: 'Tu propiedad ha sido enviada para revisión y será listada pendiente de aprobación.',
         errorTitle: 'Error al guardar la propiedad',
