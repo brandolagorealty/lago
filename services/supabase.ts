@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Property, PropertyType, Agent, PropertyStatus, Lead, UserRole, UserRoleType, AuditLog } from '../types';
+import { Property, PropertyType, Agent, PropertyStatus, Lead, UserRole, UserRoleType, AuditLog, LagoTask, TaskStatus } from '../types';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -551,5 +551,76 @@ export const propertyService = {
       return [];
     }
     return data || [];
+  },
+
+  // --- TASKS (JIRA CLONE) ---
+
+  // Get all tasks
+  async getTasks(): Promise<LagoTask[]> {
+    if (!supabase) return [];
+    
+    // RLS will automatically filter what the user can see (superadmins see all, asesores see their own)
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('due_date', { ascending: true, nullsFirst: false });
+
+    if (error) {
+      console.error('Error fetching tasks:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  // Create a new task
+  async createTask(taskData: Partial<LagoTask>): Promise<{ success: boolean; data?: LagoTask; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([taskData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating task:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, data };
+  },
+
+  // Update a task (e.g. changing status by dragging)
+  async updateTask(id: string, updates: Partial<LagoTask>): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating task:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  },
+
+  // Delete a task
+  async deleteTask(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { error, count } = await supabase
+      .from('tasks')
+      .delete({ count: 'exact' })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting task:', error);
+      return { success: false, error: error.message };
+    }
+    if (count === 0) {
+      return { success: false, error: "Permiso denegado por seguridad o la tarea no existe." };
+    }
+    return { success: true };
   }
 };

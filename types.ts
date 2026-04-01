@@ -95,3 +95,18 @@ export interface AuditLog {
   new_data?: any;
   created_at: string;
 }
+
+export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
+
+export interface LagoTask {
+  id: string;
+  title: string;
+  description?: string;
+  link?: string;
+  status: TaskStatus;
+  due_date?: string;
+  assignee_id?: string;
+  assignor_id?: string;
+  created_at: string;
+  updated_at: string;
+}

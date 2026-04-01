@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import PropertyForm from '../components/PropertyForm';
+import TasksModule from '../components/TasksModule';
 import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus, UserRole, AuditLog } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -61,7 +62,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
     const [showForm, setShowForm] = useState(false);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'crm' | 'team' | 'seguridad' | 'auditoria'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'tasks' | 'crm' | 'team' | 'seguridad' | 'auditoria'>('dashboard');
     const [properties, setProperties] = useState<Property[]>([]);
     const [agents, setAgents] = useState<Agent[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -620,6 +621,13 @@ const Admin: React.FC = () => {
                     >
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                         Inventario
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'tasks' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
+                    >
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                        Lago Hub (Tareas)
                     </button>
                     <button
                         onClick={() => setActiveTab('crm')}
@@ -1275,6 +1283,19 @@ const Admin: React.FC = () => {
                         </div>
                     </div>
                 )}
+                {/* Modulo de Tareas / Lago Hub */}
+                {activeTab === 'tasks' && (
+                    <div className="flex-1 animate-in fade-in space-y-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h1 className="text-3xl font-black text-slate-800 tracking-tight">Lago Hub</h1>
+                                <p className="text-slate-500 font-medium">Gestor de Tareas y Actividades Corporativas</p>
+                            </div>
+                        </div>
+                        <TasksModule currentUserRole={currentUserRole} />
+                    </div>
+                )}
+
             </main>
             </div>
 
