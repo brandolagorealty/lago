@@ -624,3 +624,20 @@ export const propertyService = {
     return { success: true };
   }
 };
+
+// Auth helper service for password recovery
+export const authService = {
+  async resetPassword(email: string, redirectTo: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo
+    });
+    return { success: !error, error: error?.message };
+  },
+
+  async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { success: !error, error: error?.message };
+  }
+};
