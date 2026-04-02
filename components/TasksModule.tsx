@@ -168,6 +168,23 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 if (success && data) {
                     setTasks(prev => [...prev, data]);
                     setIsModalOpen(false);
+
+                    // 🔔 Disparar notificación (Google Calendar + WhatsApp) de forma asíncrona
+                    // No bloqueamos la UI si falla
+                    if (data.id && data.assignee_id) {
+                        const session = await supabase.auth.getSession();
+                        const accessToken = session.data.session?.access_token;
+                        if (accessToken) {
+                            fetch('/.netlify/functions/task-created-notify', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${accessToken}`,
+                                },
+                                body: JSON.stringify({ taskId: data.id, assigneeId: data.assignee_id }),
+                            }).catch(err => console.warn('[Notify] Background notification failed:', err));
+                        }
+                    }
                 } else {
                     alert('Error al crear tarea (Supabase): ' + error);
                     console.error('Detalle error crear tarea:', error);
