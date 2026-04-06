@@ -53,25 +53,34 @@ async function sendWhatsAppMessage(toPhone, taskTitle, taskDescription, dueDate,
     ? new Date(dueDate).toLocaleDateString('es-VE', { day: '2-digit', month: 'long', year: 'numeric' })
     : 'No especificada';
 
+  // Usamos hello_world (pre-aprobada por Meta) mientras se aprueba la plantilla personalizada
+  // Una vez aprobada alerta_tarea_pendiente, cambiar templateName y los componentes abajo
+  const useHelloWorld = !process.env.META_TEMPLATE_READY;
+
   const body = {
     messaging_product: 'whatsapp',
     to: formattedPhone,
     type: 'template',
-    template: {
-      name: templateName,
-      language: { code: 'es' },
-      components: [
-        {
-          type: 'body',
-          parameters: [
-            { type: 'text', text: taskTitle },
-            { type: 'text', text: taskDescription || 'Sin descripción adicional.' },
-            { type: 'text', text: dueDateFormatted },
-            { type: 'text', text: taskLink || 'https://lago-hub.netlify.app' },
+    template: useHelloWorld
+      ? {
+          name: 'hello_world',
+          language: { code: 'en_US' },
+        }
+      : {
+          name: templateName,
+          language: { code: 'es' },
+          components: [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: taskTitle },
+                { type: 'text', text: taskDescription || 'Sin descripción adicional.' },
+                { type: 'text', text: dueDateFormatted },
+                { type: 'text', text: taskLink || 'https://lago-hub.netlify.app' },
+              ],
+            },
           ],
         },
-      ],
-    },
   };
 
   const response = await fetch(`https://graph.facebook.com/v22.0/${phoneId}/messages`, {
