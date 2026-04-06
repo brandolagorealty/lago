@@ -156,10 +156,11 @@ exports.handler = async (event) => {
 
     const calendarEvent = {
       summary: `📋 Tarea Lago Hub: ${task.title}`,
-      description: `${task.description || ''}\n\n🔗 Gestionar tarea: ${taskLink}`,
+      description: `Asignado a: ${agent.name} (${agent.email})\n\n${task.description || ''}\n\n🔗 Gestionar tarea: ${taskLink}`,
       start: { dateTime: startDate.toISOString(), timeZone: 'America/Caracas' },
       end: { dateTime: endDate.toISOString(), timeZone: 'America/Caracas' },
-      attendees: [{ email: agent.email }],
+      // No incluimos attendees para evitar error de Domain-Wide Delegation
+      // El asesor recibe la notificación por WhatsApp con el link directo
       reminders: {
         useDefault: false,
         overrides: [
