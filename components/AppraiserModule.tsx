@@ -64,7 +64,10 @@ const AppraiserModule: React.FC = () => {
             });
 
             const responseData = await response.json();
-            if (!response.ok) throw new Error(responseData.error || 'Error al generar la tasación');
+            if (!response.ok) {
+                const errorMsg = responseData.details ? `${responseData.error}: ${responseData.details}` : (responseData.error || 'Error al generar la tasación');
+                throw new Error(errorMsg);
+            }
 
             setResult(responseData);
         } catch (err: any) {

@@ -102,7 +102,10 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                 const data = await response.json();
 
                 if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    resultData = JSON.parse(data.candidates[0].content.parts[0].text);
+                    let text = data.candidates[0].content.parts[0].text;
+                    // Limpieza de posibles bloques de código markdown
+                    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    resultData = JSON.parse(text);
                     success = true;
                     break;
                 } else {
