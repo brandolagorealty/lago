@@ -4,6 +4,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import PropertyForm from '../components/PropertyForm';
 import TasksModule from '../components/TasksModule';
 import AppraiserModule from '../components/AppraiserModule';
+import ProspectorModule from '../components/ProspectorModule';
 import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus, UserRole, AuditLog } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -63,7 +64,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
     const [showForm, setShowForm] = useState(false);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'tasks' | 'crm' | 'appraiser' | 'team' | 'seguridad' | 'auditoria'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'tasks' | 'crm' | 'appraiser' | 'prospector' | 'team' | 'seguridad' | 'auditoria'>('dashboard');
     const [properties, setProperties] = useState<Property[]>([]);
     const [agents, setAgents] = useState<Agent[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -104,6 +105,12 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         fetchData();
+        
+        // Auto-navigate to prospector if tab param exists (from Bookmarklet)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'prospector') {
+            setActiveTab('prospector');
+        }
     }, []);
 
     const fetchData = async () => {
@@ -645,7 +652,16 @@ const Admin: React.FC = () => {
                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                             Tasador AI
                         </div>
-                        <span className="px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-500 text-[10px] font-black">
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('prospector')}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'prospector' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-indigo-500 hover:bg-white/5'}`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            Prospector AI
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-[10px] font-black">
                             NUEVO
                         </span>
                     </button>
@@ -1312,6 +1328,12 @@ const Admin: React.FC = () => {
                 {activeTab === 'appraiser' && (
                     <div className="flex-1 animate-in fade-in space-y-4">
                         <AppraiserModule />
+                    </div>
+                )}
+                {/* Modulo de Prospector AI */}
+                {activeTab === 'prospector' && (
+                    <div className="flex-1 animate-in fade-in space-y-4">
+                        <ProspectorModule />
                     </div>
                 )}
 
