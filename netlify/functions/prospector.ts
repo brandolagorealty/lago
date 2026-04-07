@@ -12,8 +12,8 @@ export const handler = async (event: any) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'Consulta vacía.' }) };
         }
         
-        // Usamos la llave dedicada para scraping, o caemos en la general si no está.
-        const API_KEY = process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        // Usamos la llave de OpenRouter prioritariamente, o caemos en las de Gemini si estaban (migración)
+        const API_KEY = process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
         if (!API_KEY) {
             return {
@@ -85,11 +85,10 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
 
         const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
 
-        // Intentamos el modelo avanzado primero, luego los estándar si el usuario tiene llaves gratuitas funcionales.
         const modelsToTry = [
-            'gemini-2.0-flash',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro'
+            'google/gemini-2.0-flash-lite-preview-02-05:free',
+            'google/gemini-2.0-pro-exp-02-05:free',
+            'meta-llama/llama-3.3-70b-instruct:free'
         ];
 
         let lastError = "";
@@ -98,46 +97,33 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
 
         for (const modelName of modelsToTry) {
             try {
-                const cleanModelName = modelName.trim().replace(' ', '');
-                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${API_KEY}`;
-                
-                const response = await fetch(URL, {
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'HTTP-Referer': 'https://lago-realty.netlify.app',
+                        'X-Title': 'Lago Realty Hub',
+                        'Content-Type': 'application/json' 
+                    },
                     body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemInstructions }] },
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            response_mime_type: "application/json",
-                            response_schema: {
-                                type: "array",
-                                items: {
-                                    type: "object",
-                                    properties: {
-                                        title: { type: "string" },
-                                        price: { type: "string" },
-                                        url: { type: "string" },
-                                        isAgent: { type: "boolean" },
-                                        reasoning: { type: "string" },
-                                        hookMessage: { type: "string" }
-                                    },
-                                    required: ["title", "price", "url", "isAgent", "reasoning", "hookMessage"]
-                                }
-                            }
-                        }
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: systemInstructions },
+                            { role: "user", content: prompt }
+                        ]
                     })
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    let responseText = data.candidates[0].content.parts[0].text;
+                if (response.ok && data.choices?.[0]?.message?.content) {
+                    let responseText = data.choices[0].message.content;
                     responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
                     resultData = JSON.parse(responseText);
                     success = true;
                     break;
                 } else {
-                    lastError += `[${cleanModelName}]: ${data.error?.message || JSON.stringify(data)}. `;
+                    lastError += `[${modelName}]: ${data.error?.message || JSON.stringify(data)}. `;
                 }
             } catch (err: any) {
                 lastError += `[${modelName}]: ${err.message}. `;

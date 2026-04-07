@@ -5,7 +5,7 @@ export const handler = async (event: any) => {
 
     try {
         const { ubicacion, superficie, distribucion, estado, extras } = JSON.parse(event.body);
-        const API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        const API_KEY = process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
         if (!API_KEY) {
             return {
@@ -55,10 +55,9 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
     `;
 
         const modelsToTry = [
-            'gemini-flash-latest',
-            'gemini-1.5-flash-latest',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-flash'
+            'google/gemini-2.0-flash-lite-preview-02-05:free',
+            'google/gemini-2.0-pro-exp-02-05:free',
+            'meta-llama/llama-3.3-70b-instruct:free'
         ];
 
         let lastError = "";
@@ -67,50 +66,35 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
 
         for (const modelName of modelsToTry) {
             try {
-                // Limpiamos el nombre por si hay espacios accidentales
-                const cleanModelName = modelName.trim().replace(' ', '');
-                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${API_KEY}`;
-                
-                const response = await fetch(URL, {
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'HTTP-Referer': 'https://lago-realty.netlify.app',
+                        'X-Title': 'Lago Realty Hub',
+                        'Content-Type': 'application/json' 
+                    },
                     body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemInstructions }] },
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            response_mime_type: "application/json",
-                            response_schema: {
-                                type: "object",
-                                properties: {
-                                    markdownReport: { type: "string" },
-                                    suggestedValue: {
-                                        type: "object",
-                                        properties: {
-                                            base: { type: "integer" },
-                                            high: { type: "integer" },
-                                            low: { type: "integer" }
-                                        },
-                                        required: ["base", "high", "low"]
-                                    }
-                                },
-                                required: ["markdownReport", "suggestedValue"]
-                            }
-                        }
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: systemInstructions },
+                            { role: "user", content: prompt }
+                        ]
                     })
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    let text = data.candidates[0].content.parts[0].text;
+                if (response.ok && data.choices?.[0]?.message?.content) {
+                    let text = data.choices[0].message.content;
                     // Limpieza de posibles bloques de código markdown
                     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
                     resultData = JSON.parse(text);
                     success = true;
                     break;
                 } else {
-                    lastError += `[${cleanModelName}]: ${data.error?.message || JSON.stringify(data)}. `;
-                    console.warn(`Model ${cleanModelName} failed:`, data.error?.message || data);
+                    lastError += `[${modelName}]: ${data.error?.message || JSON.stringify(data)}. `;
+                    console.warn(`Model ${modelName} failed:`, data.error?.message || data);
                 }
             } catch (err: any) {
                 lastError += `[${modelName}]: ${err.message}. `;

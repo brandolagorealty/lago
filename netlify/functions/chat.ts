@@ -6,7 +6,7 @@ export const handler = async (event: any) => {
 
     try {
         const { userMessage, properties, chatHistory, language } = JSON.parse(event.body);
-        const API_KEY = process.env.VITE_GEMINI_API_KEY;
+        const API_KEY = process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_API_KEY;
         const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
         const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
         const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -66,49 +66,37 @@ export const handler = async (event: any) => {
     `;
 
         const modelsToTry = [
-            'gemini-3-flash-preview',
-            'gemini-flash-latest',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-flash'
+            'google/gemini-2.0-flash-lite-preview-02-05:free',
+            'google/gemini-2.0-pro-exp-02-05:free',
+            'meta-llama/llama-3.3-70b-instruct:free'
         ];
 
         let lastError = "";
 
         for (const modelName of modelsToTry) {
             try {
-                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
-                const response = await fetch(URL, {
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'HTTP-Referer': 'https://lago-realty.netlify.app',
+                        'X-Title': 'Lago Realty Hub',
+                        'Content-Type': 'application/json' 
+                    },
                     body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemInstructions }] },
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            response_mime_type: "application/json",
-                            response_schema: {
-                                type: "object",
-                                properties: {
-                                    reply: { type: "string" },
-                                    leadInfo: {
-                                        type: "object",
-                                        properties: {
-                                            name: { type: "string" },
-                                            phone: { type: "string" },
-                                            email: { type: "string" },
-                                            intent: { type: "string" }
-                                        }
-                                    }
-                                },
-                                required: ["reply"]
-                            }
-                        }
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: systemInstructions },
+                            { role: "user", content: prompt }
+                        ]
                     })
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    const result = JSON.parse(data.candidates[0].content.parts[0].text);
+                if (response.ok && data.choices?.[0]?.message?.content) {
+                    const responseText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const result = JSON.parse(responseText);
                     const { reply, leadInfo } = result;
 
                     // Intento de guardar Lead (solo si están los 3 datos principales)
