@@ -95,8 +95,15 @@ export const handler = async (event: any) => {
                 const data = await response.json();
 
                 if (response.ok && data.choices?.[0]?.message?.content) {
-                    const responseText = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
-                    const result = JSON.parse(responseText);
+                    const responseText = data.choices[0].message.content;
+                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                    
+                    if (!jsonMatch) {
+                        lastError += `[${modelName}]: No valid JSON found. Response: ${responseText.substring(0, 50)}... `;
+                        continue;
+                    }
+
+                    const result = JSON.parse(jsonMatch[0]);
                     const { reply, leadInfo } = result;
 
                     // Intento de guardar Lead (solo si están los 3 datos principales)

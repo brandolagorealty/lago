@@ -87,9 +87,14 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
 
                 if (response.ok && data.choices?.[0]?.message?.content) {
                     let text = data.choices[0].message.content;
-                    // Limpieza de posibles bloques de código markdown
-                    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                    resultData = JSON.parse(text);
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    
+                    if (!jsonMatch) {
+                        lastError += `[${modelName}]: No valid JSON found. Response: ${text.substring(0, 50)}... `;
+                        continue;
+                    }
+
+                    resultData = JSON.parse(jsonMatch[0]);
                     success = true;
                     break;
                 } else {

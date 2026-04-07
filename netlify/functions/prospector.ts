@@ -118,10 +118,14 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
 
                 if (response.ok && data.choices?.[0]?.message?.content) {
                     let responseText = data.choices[0].message.content;
-                    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                    resultData = JSON.parse(responseText);
-                    success = true;
-                    break;
+                    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+                    if (jsonMatch) {
+                        resultData = JSON.parse(jsonMatch[0]);
+                        success = true;
+                        break;
+                    } else {
+                        lastError += `[${modelName}]: No valid JSON array found. Response: ${responseText.substring(0,50)}... `;
+                    }
                 } else {
                     lastError += `[${modelName}]: ${data.error?.message || JSON.stringify(data)}. `;
                 }
