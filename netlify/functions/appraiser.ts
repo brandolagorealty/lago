@@ -5,7 +5,7 @@ export const handler = async (event: any) => {
 
     try {
         const { ubicacion, superficie, distribucion, estado, extras } = JSON.parse(event.body);
-        const API_KEY = process.env.VITE_GEMINI_API_KEY;
+        const API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
         if (!API_KEY) {
             return {
@@ -55,6 +55,7 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
     `;
 
         const modelsToTry = [
+            'gemini- flash-latest',
             'gemini-1.5-flash-latest',
             'gemini-2.0-flash-exp',
             'gemini-1.5-flash'
@@ -66,7 +67,10 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
 
         for (const modelName of modelsToTry) {
             try {
-                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+                // Limpiamos el nombre por si hay espacios accidentales
+                const cleanModelName = modelName.trim().replace(' ', '');
+                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${API_KEY}`;
+                
                 const response = await fetch(URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -102,11 +106,11 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                     success = true;
                     break;
                 } else {
-                    lastError = data.error?.message || JSON.stringify(data);
-                    console.warn(`Model ${modelName} failed:`, lastError);
+                    lastError += `[${cleanModelName}]: ${data.error?.message || JSON.stringify(data)}. `;
+                    console.warn(`Model ${cleanModelName} failed:`, data.error?.message || data);
                 }
             } catch (err: any) {
-                lastError = err.message;
+                lastError += `[${modelName}]: ${err.message}. `;
                 console.error(`Error with model ${modelName}:`, err);
             }
         }
@@ -120,7 +124,10 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
         } else {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: lastError || 'Error al conectar con Gemini tras varios intentos.' }),
+                body: JSON.stringify({ 
+                    error: 'Error al conectar con Gemini tras varios intentos.',
+                    details: lastError 
+                }),
             };
         }
     } catch (error: any) {
