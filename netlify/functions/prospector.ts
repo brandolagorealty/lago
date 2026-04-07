@@ -4,7 +4,7 @@ export const handler = async (event: any) => {
     }
 
     try {
-        const { text } = JSON.parse(event.body);
+        const { query } = JSON.parse(event.body);
         
         // Usamos la llave dedicada para scraping, o caemos en la general si no está.
         const API_KEY = process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
@@ -17,37 +17,39 @@ export const handler = async (event: any) => {
         }
 
         const systemInstructions = `
-Actúa como un analista experto en captación inmobiliaria en Maracaibo, Zulia.
-Te pasaré el texto crudo (sucio) copiado de una publicación de clasificados (Probablemente Facebook Marketplace o grupos de WhatsApp).
-Tu misión es extraer los datos clave, deducir con lógica agresiva si quien publica es un DUEÑO DIRECTO o una AGENCIA/ASESOR INMOBILIARIO camuflado, y redactar un guion breve para abordarlo.
+Actúa como un agresivo analista experto en captación inmobiliaria. 
+Tu misión es ejecutar una búsqueda en internet y extraer las propiedades encontradas basado en la consulta del usuario.
+Encuentra propiedades (preferiblemente trato directo o dueño directo) usando la herramienta de Búsqueda de Google.
+Extrae los datos y deduce lógicamente si el contacto publicado es DUEÑO DIRECTO o una AGENCIA/ASESOR camuflado.
+
+REGLAS DE BÚSQUEDA:
+- Solo devuelve propiedades reales publicadas recientemente.
+- Explora portales como conlallave, encuentra24, mercadolibre, inmobilia, o agrupadores.
+- Excluye resultados basura o enlaces genéricos.
 
 REGLAS PARA EL VEREDICTO (isAgent):
-- Sé muy desconfiado. Si ves palabras clave como: "somos", "agencia", "asesor", "honorarios", "afiliado", "código", "franquicia", o múltiples propiedades a la venta, pon isAgent: true.
-- Si ves frases como: "mi casa", "trato directo", "sin intermediarios", "dueño", pon isAgent: false.
+- Sé muy desconfiado. Si ves palabras clave como: "agencia", "asesores", "REMAX", "Century21", "afiliado", "Código", "honorarios", pon isAgent: true.
+- Si ves frases como: "trato directo", "mi casa", "dueño", pon isAgent: false.
 
-ESTRUCTURA JSON REQUERIDA DE SALIDA:
-{
-  "title": "Un título corto inferido sobre el inmueble",
-  "price": "Precio extraído (incluye moneda) o 'No publicado'",
-  "isAgent": true o false,
-  "reasoning": "Explicación de 1 o 2 líneas de por qué crees que es dueño o asesor.",
-  "hookMessage": "Un mensaje corto (Rompehielos) de WhatsApp. Si es DUEÑO DIRECTO: preséntate sugerentemente como experto de Lago Realty ofreciendo ayuda gratuita o tu cartera de clientes para vender su casa rápido. NUNCA OFREZCAS COMPRARLA TÚ MISMO. Si es ASESOR: sugiere una posible alianza o pregunta por el inmueble cordialmente."
-}
-NO DEVUELVAS NADA MÁS QUE EL JSON.
-    `;
+ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
+[
+  {
+    "title": "Un título corto inferido sobre el inmueble",
+    "price": "Precio extraído (ej. $35,000) o 'No publicado'",
+    "url": "El enlace web de origen hacia la propiedad encontrada",
+    "isAgent": true o false,
+    "reasoning": "Explicación breve de por qué crees que es dueño o agencia",
+    "hookMessage": "Mensaje corto de WhatsApp. Si es DUEÑO DIRECTO: preséntate sugerentemente como experto de Lago Realty ofreciendo ayuda o tu cartera de clientes para vender su casa rápido. NUNCA OFREZCAS COMPRARLA TÚ MISMO. Si es ASESOR: sugiere amablemente una posible alianza. Incluye placeholders como [Tu Nombre]."
+  }
+]
+NO DEVUELVAS NADA MÁS QUE EL JSON (SIN FORMATO MARKDOWN NI NADA, SOLO ESCRITO COMO UN ARRAY JSON VÁLIDO).
+`;
 
-        const prompt = `
-TEXTO DE LA PUBLICACIÓN A ANALIZAR:
-"""
-${text}
-"""
-    `;
+        const prompt = `REALIZA LA SIGUIENTE BÚSQUEDA INMOBILIARIA Y DEVUELVE MÁXIMO 5 PROSPECTOS ÚTILES:\n\n${query}`;
 
         const modelsToTry = [
-            'gemini-flash-latest',
             'gemini-1.5-flash-latest',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-flash'
+            'gemini-1.5-pro-latest'
         ];
 
         let lastError = "";
@@ -65,18 +67,23 @@ ${text}
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: systemInstructions }] },
                         contents: [{ parts: [{ text: prompt }] }],
+                        tools: [{ googleSearch: {} }],
                         generationConfig: {
                             response_mime_type: "application/json",
                             response_schema: {
-                                type: "object",
-                                properties: {
-                                    title: { type: "string" },
-                                    price: { type: "string" },
-                                    isAgent: { type: "boolean" },
-                                    reasoning: { type: "string" },
-                                    hookMessage: { type: "string" }
-                                },
-                                required: ["title", "price", "isAgent", "reasoning", "hookMessage"]
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: {
+                                        title: { type: "string" },
+                                        price: { type: "string" },
+                                        url: { type: "string" },
+                                        isAgent: { type: "boolean" },
+                                        reasoning: { type: "string" },
+                                        hookMessage: { type: "string" }
+                                    },
+                                    required: ["title", "price", "url", "isAgent", "reasoning", "hookMessage"]
+                                }
                             }
                         }
                     })
@@ -108,7 +115,7 @@ ${text}
             return {
                 statusCode: 500,
                 body: JSON.stringify({ 
-                    error: 'Error al procesar el texto del prospecto con Gemini.',
+                    error: 'Error al ejecutar la búsqueda automatizada con Gemini.',
                     details: lastError 
                 }),
             };

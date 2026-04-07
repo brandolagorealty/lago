@@ -105,12 +105,7 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-        
-        // Auto-navigate to prospector if tab param exists (from Bookmarklet)
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('tab') === 'prospector') {
-            setActiveTab('prospector');
-        }
+        // Auto-navigate functionality was removed along with the bookmarklet.
     }, []);
 
     const fetchData = async () => {

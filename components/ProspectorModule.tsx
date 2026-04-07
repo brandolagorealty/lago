@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Link as LinkIcon, AlertTriangle, CheckCircle2, User, Building, MessageSquare, Copy, Settings, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Globe, AlertTriangle, CheckCircle2, User, Building, MessageSquare, Copy, ExternalLink, Check } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
 interface ProspectResult {
   title: string;
   price: string;
+  url: string;
   isAgent: boolean;
   reasoning: string;
   hookMessage: string;
@@ -12,53 +13,44 @@ interface ProspectResult {
 
 export default function ProspectorModule() {
     const { session } = useAuth();
-    const [rawText, setRawText] = useState('');
+    const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<ProspectResult | null>(null);
+    const [results, setResults] = useState<ProspectResult[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-    // Comprobar si hay apiKey configurada (aunque sea via env)
-    const [apiKeySet, setApiKeySet] = useState(true); // Simulamos true porque confiamos en el ENV del backend
-
-    useEffect(() => {
-        // Al cargar, verificamos si venimos de un bookmarklet leyendo la URL
-        const params = new URLSearchParams(window.location.search);
-        const textParam = params.get('text');
-        
-        if (textParam) {
-            setRawText(textParam);
-            // Limpiamos la URL para evitar recargas raras
-            window.history.replaceState({}, document.title, window.location.pathname + '?tab=prospector');
-            // Auto procesar
-            processText(textParam);
-        }
-    }, []);
-
-    const processText = async (textToProcess: string = rawText) => {
-        if (!textToProcess.trim()) {
-            setError('Por favor ingresa o pega el texto del anuncio.');
+    const processSearch = async () => {
+        if (!query.trim()) {
+            setError('Por favor ingresa una búsqueda válida.');
             return;
         }
 
         setLoading(true);
         setError(null);
-        setResult(null);
+        setResults([]);
 
         try {
             const response = await fetch('/.netlify/functions/prospector', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: textToProcess })
+                body: JSON.stringify({ query: query })
             });
 
             const responseData = await response.json();
 
             if (!response.ok) {
-                throw new Error(responseData.details ? `${responseData.error}: ${responseData.details}` : (responseData.error || 'Error al procesar con IA'));
+                throw new Error(responseData.details ? `${responseData.error}: ${responseData.details}` : (responseData.error || 'Error al buscar con IA'));
             }
 
-            setResult(responseData);
+            if (!Array.isArray(responseData)) {
+                 throw new Error("El formato de respuesta de la IA es incorrecto.");
+            }
+
+            if (responseData.length === 0) {
+                 setError('No se encontraron publicaciones recientes útiles con esos términos.');
+            }
+
+            setResults(responseData);
         } catch (err: any) {
             setError(err.message || 'Error de conexión.');
         } finally {
@@ -66,167 +58,132 @@ export default function ProspectorModule() {
         }
     };
 
-    const copyToClipboard = () => {
-        if (result?.hookMessage) {
-            navigator.clipboard.writeText(result.hookMessage);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+    const copyToClipboard = (text: string, index: number) => {
+        if (text) {
+            navigator.clipboard.writeText(text);
+            setCopiedIndex(index);
+            setTimeout(() => setCopiedIndex(null), 2000);
         }
     };
 
-    // Generador Dinámico del Bookmarklet
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://lagorealty.com.ve';
-    const bookmarkletCode = `javascript:(function(){var s=window.getSelection().toString();if(!s){alert('❗ Por favor, primero resalta/selecciona el texto de la descripción del inmueble y luego haz clic en este botón.');return;}window.open('${origin}/admin?tab=prospector&text='+encodeURIComponent(s.substring(0,4000)),'_blank');})();`;
-
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Search className="w-7 h-7 text-indigo-600" />
-                        Prospector Inteligente (Captación)
+                    <h2 className="text-3xl font-serif font-bold text-slate-900 flex items-center gap-3">
+                        <Search className="w-8 h-8 text-indigo-600" />
+                        Prospector Integrado
                     </h2>
-                    <p className="text-slate-500 mt-1">Extrae propiedades de dueños directos desde Facebook o WhatsApp y recibe un guion de contacto.</p>
+                    <p className="text-slate-500 mt-2 text-lg">
+                        Conectado a Google Search en vivo. Encuentra dueños directos vendiendo en portales públicos.
+                    </p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Columna Izquierda: Entrada y Herramientas */}
-                <div className="lg:col-span-1 space-y-6">
-                    {/* Tarjeta del Bookmarklet */}
-                    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-xl border border-indigo-100 shadow-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <LinkIcon className="w-16 h-16" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-indigo-900 mb-2">1. Captura con 1 Clic 🪄</h3>
-                        <p className="text-sm text-indigo-700 mb-4">
-                            Arrastra el siguiente botón hacia la <b>Barra de Marcadores</b> (Favoritos) de tu navegador. Luego ve a Facebook Marketplace, selecciona el texto de un anuncio y pulsa tu nuevo marcador.
-                        </p>
-                        
-                        <div className="flex justify-center py-4 bg-white/50 rounded-lg border border-indigo-200 border-dashed">
-                            <a 
-                                href={bookmarkletCode}
-                                onClick={(e) => e.preventDefault()}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-medium shadow-md shadow-indigo-200 transition-transform active:scale-95 cursor-grab active:cursor-grabbing flex items-center gap-2"
-                            >
-                                <Search className="w-4 h-4" />
-                                Capturar para Lago
-                            </a>
-                        </div>
-                        <p className="text-xs text-center text-indigo-500 mt-3 font-medium">← Arrástralo a tu barra superior →</p>
-                    </div>
-
-                    {/* Entrada Manual */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h3 className="text-lg font-semibold text-slate-800 mb-2">2. O pégalo manual</h3>
-                        <p className="text-sm text-slate-500 mb-4">Si estás en el móvil, simplemente pega el texto del anuncio aquí abajo.</p>
-                        
-                        <textarea
-                            value={rawText}
-                            onChange={(e) => setRawText(e.target.value)}
-                            placeholder="Ej: Se vende hermosa casa en zona norte, 3 habs, 2 baños. Trato directo con dueño... $35,000"
-                            className="w-full h-40 p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-700 placeholder-slate-400 text-sm"
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                <div className="max-w-3xl mx-auto flex gap-4">
+                    <div className="flex-1 relative">
+                        <Globe className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && processSearch()}
+                            placeholder="Ej: Apartamentos en alquiler zona norte trato directo..."
+                            className="w-full pl-14 pr-4 py-4 text-lg border-2 border-slate-200 rounded-2xl focus:ring-0 focus:border-indigo-500 transition-colors"
                         />
-                        
-                        {error && (
-                            <div className="mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                                <span className="break-words">{error}</span>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={() => processText()}
-                            disabled={loading || !rawText.trim()}
-                            className="w-full mt-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Analizando prospecto...
-                                </>
-                            ) : (
-                                <>
-                                    <Search className="w-5 h-5" />
-                                    Analizar Prospecto
-                                </>
-                            )}
-                        </button>
                     </div>
-                </div>
-
-                {/* Columna Derecha: Resultados */}
-                <div className="lg:col-span-2">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[500px] flex flex-col h-full">
-                        {result ? (
-                            <div className="p-8 space-y-8">
-                                {/* Veredicto */}
-                                <div className={`p-6 rounded-xl border ${result.isAgent ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
-                                    <div className="flex items-start gap-4">
-                                        <div className={`p-3 rounded-full ${result.isAgent ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                                            {result.isAgent ? <Building className="w-8 h-8" /> : <User className="w-8 h-8" />}
-                                        </div>
-                                        <div>
-                                            <h3 className={`text-xl font-bold ${result.isAgent ? 'text-red-900' : 'text-green-900'}`}>
-                                                {result.isAgent ? '¡Alerta! Probablemente es una Agencia' : '¡Trato Directo! (Dueño)'}
-                                            </h3>
-                                            <p className={`mt-1 text-sm ${result.isAgent ? 'text-red-700' : 'text-green-700'}`}>
-                                                {result.reasoning}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Datos Extraídos */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 border border-slate-100 bg-slate-50 rounded-lg">
-                                        <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Título Inferido</p>
-                                        <p className="font-semibold text-slate-800">{result.title}</p>
-                                    </div>
-                                    <div className="p-4 border border-slate-100 bg-slate-50 rounded-lg">
-                                        <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Precio Detectado</p>
-                                        <p className="font-semibold text-slate-800 text-xl">{result.price}</p>
-                                    </div>
-                                </div>
-
-                                {/* Guion de Venta */}
-                                <div className="mt-8 border border-slate-200 rounded-xl overflow-hidden">
-                                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-slate-700 font-semibold">
-                                            <MessageSquare className="w-5 h-5 text-indigo-600" />
-                                            Guion Rompehielos Sugerido
-                                        </div>
-                                        <button 
-                                            onClick={copyToClipboard}
-                                            className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors bg-white px-3 py-1.5 border border-slate-200 rounded-lg shadow-sm hover:border-indigo-200 hover:bg-indigo-50"
-                                        >
-                                            {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                                            {copied ? '¡Copiado!' : 'Copiar Guion'}
-                                        </button>
-                                    </div>
-                                    <div className="p-6 bg-white">
-                                        <p className="text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">
-                                            {result.hookMessage}
-                                        </p>
-                                    </div>
-                                    <div className="bg-indigo-50 px-6 py-3 text-sm text-indigo-700 font-medium flex items-center justify-between border-t border-indigo-100">
-                                        <span>Pro tip: Envíalo por WhatsApp de inmediato para no enfriar el prospecto.</span>
-                                    </div>
-                                </div>
-                            </div>
+                    <button
+                        onClick={processSearch}
+                        disabled={loading || !query.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center gap-2 text-lg"
+                    >
+                        {loading ? (
+                            <><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Buscando...</>
                         ) : (
-                            <div className="flex flex-col items-center justify-center flex-1 text-center p-12 text-slate-500">
-                                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                    <Search className="w-10 h-10 text-slate-300" />
-                                </div>
-                                <h3 className="text-xl font-semibold text-slate-700 mb-2">Esperando datos</h3>
-                                <p className="max-w-sm">Utiliza el botón mágico desde Facebook Marketplace o pega el texto directamente para que la IA extraiga el perfil del vendedor.</p>
-                            </div>
+                            <><Search className="w-6 h-6" /> Escanear</>
                         )}
-                    </div>
+                    </button>
                 </div>
+                {error && (
+                    <div className="max-w-3xl mx-auto mt-4 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        <span className="font-medium text-sm">{error}</span>
+                    </div>
+                )}
             </div>
+
+            {results.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+                    <div className="col-span-full">
+                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest pl-2">Prospectos Encontrados ({results.length})</h3>
+                    </div>
+                    {results.map((result, index) => (
+                        <div key={index} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                            <div className={`p-5 flex items-start gap-4 border-b ${result.isAgent ? 'bg-red-50 border-red-100' : 'bg-green-50/50 border-green-100'}`}>
+                                <div className={`p-3 rounded-full shrink-0 ${result.isAgent ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                    {result.isAgent ? <Building className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className={`text-lg font-bold leading-tight truncate mb-1 ${result.isAgent ? 'text-red-900' : 'text-green-900'}`}>
+                                        {result.isAgent ? 'Agencia / Asesor Inmobiliario' : 'Dueño Directo'}
+                                    </h4>
+                                    <p className={`text-xs font-medium leading-relaxed ${result.isAgent ? 'text-red-600' : 'text-green-700'}`}>
+                                        {result.reasoning}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="p-5 flex-1 flex flex-col gap-4">
+                                <div className="flex justify-between items-start gap-4">
+                                    <div>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Inmueble</p>
+                                        <h5 className="font-semibold text-slate-800 line-clamp-2 leading-tight">{result.title}</h5>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Precio</p>
+                                        <p className="font-bold text-slate-900 text-lg bg-slate-100 px-2 rounded-md">{result.price}</p>
+                                    </div>
+                                </div>
+
+                                <a href={result.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 font-bold hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors mt-auto w-max">
+                                    <ExternalLink className="w-4 h-4" />
+                                    Ver Origen en Web
+                                </a>
+                            </div>
+
+                            <div className="mt-auto border-t border-slate-100 bg-slate-50/50">
+                                <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-white">
+                                    <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
+                                        <MessageSquare className="w-4 h-4 text-slate-400" />
+                                        Rompehielos Generado
+                                    </div>
+                                    <button 
+                                        onClick={() => copyToClipboard(result.hookMessage, index)}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors bg-white px-2.5 py-1.5 border border-slate-200 rounded-md shadow-sm hover:border-indigo-200 hover:bg-indigo-50"
+                                    >
+                                        {copiedIndex === index ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                        {copiedIndex === index ? 'Copiado' : 'Copiar'}
+                                    </button>
+                                </div>
+                                <div className="p-4">
+                                    <p className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed italic">
+                                        "{result.hookMessage}"
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : !loading && !error && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <Globe className="w-24 h-24 text-slate-200 mb-6" />
+                    <h3 className="text-2xl font-serif font-bold text-slate-600 mb-2">Esperando Consulta</h3>
+                    <p className="max-w-md text-center text-slate-500">
+                        Escribe qué tipo de propiedad estás buscando captar y la inteligencia artificial rastreará la red para traerte los mejores prospectos dueños directos clasificados.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
