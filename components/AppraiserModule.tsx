@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { marked } from 'marked';
 import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../services/supabase';
@@ -240,9 +241,10 @@ const AppraiserModule: React.FC = () => {
                                         {copied ? 'Copiado' : 'Copiar Informe'}
                                     </button>
                                 </div>
-                                <div className="p-8 prose prose-slate max-w-none prose-headings:text-slate-900 prose-headings:font-bold prose-h2:text-2xl prose-h3:text-xl prose-p:text-slate-600 prose-strong:text-slate-800">
-                                    <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">{result.markdownReport}</pre>
-                                </div>
+                                <div 
+                                    className="p-8 prose prose-slate max-w-none prose-headings:text-slate-900 prose-headings:font-bold prose-h2:text-2xl prose-h3:text-xl prose-p:text-slate-600 prose-strong:text-slate-800"
+                                    dangerouslySetInnerHTML={{ __html: marked.parse(result.markdownReport) }}
+                                />
                             </div>
                         </>
                     ) : (
