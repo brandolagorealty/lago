@@ -54,49 +54,73 @@ DATOS DE INSPECCIÓN:
 Redacta el informe de valoración siguiendo estrictamente el esquema JSON solicitado y las instrucciones.
     `;
 
-        const URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-        const response = await fetch(URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemInstructions }] },
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    response_mime_type: "application/json",
-                    response_schema: {
-                        type: "object",
-                        properties: {
-                            markdownReport: { type: "string" },
-                            suggestedValue: {
+        const modelsToTry = [
+            'gemini-1.5-flash-latest',
+            'gemini-2.0-flash-exp',
+            'gemini-1.5-flash'
+        ];
+
+        let lastError = "";
+        let success = false;
+        let resultData = null;
+
+        for (const modelName of modelsToTry) {
+            try {
+                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+                const response = await fetch(URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: systemInstructions }] },
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            response_mime_type: "application/json",
+                            response_schema: {
                                 type: "object",
                                 properties: {
-                                    base: { type: "integer" },
-                                    high: { type: "integer" },
-                                    low: { type: "integer" }
+                                    markdownReport: { type: "string" },
+                                    suggestedValue: {
+                                        type: "object",
+                                        properties: {
+                                            base: { type: "integer" },
+                                            high: { type: "integer" },
+                                            low: { type: "integer" }
+                                        },
+                                        required: ["base", "high", "low"]
+                                    }
                                 },
-                                required: ["base", "high", "low"]
+                                required: ["markdownReport", "suggestedValue"]
                             }
-                        },
-                        required: ["markdownReport", "suggestedValue"]
-                    }
+                        }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    resultData = JSON.parse(data.candidates[0].content.parts[0].text);
+                    success = true;
+                    break;
+                } else {
+                    lastError = data.error?.message || JSON.stringify(data);
+                    console.warn(`Model ${modelName} failed:`, lastError);
                 }
-            })
-        });
+            } catch (err: any) {
+                lastError = err.message;
+                console.error(`Error with model ${modelName}:`, err);
+            }
+        }
 
-        const data = await response.json();
-
-        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            const result = JSON.parse(data.candidates[0].content.parts[0].text);
+        if (success) {
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(result),
+                body: JSON.stringify(resultData),
             };
         } else {
-            console.error("Gemini API Error:", data.error || data);
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: data.error?.message || 'Error desconocido' }),
+                body: JSON.stringify({ error: lastError || 'Error al conectar con Gemini tras varios intentos.' }),
             };
         }
     } catch (error: any) {
