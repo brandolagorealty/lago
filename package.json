@@ -13,6 +13,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
     "browser-image-compression": "^2.0.2",
+    "cheerio": "^1.2.0",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.577.0",
     "marked": "^18.0.0",

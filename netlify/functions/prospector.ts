@@ -1,3 +1,5 @@
+import * as cheerio from 'cheerio';
+
 export const handler = async (event: any) => {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
@@ -5,6 +7,10 @@ export const handler = async (event: any) => {
 
     try {
         const { query } = JSON.parse(event.body);
+
+        if (!query) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'Consulta vacía.' }) };
+        }
         
         // Usamos la llave dedicada para scraping, o caemos en la general si no está.
         const API_KEY = process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
@@ -16,40 +22,74 @@ export const handler = async (event: any) => {
             };
         }
 
+        // 1. Scraping Manual DuckDuckGo (Bypassing API Tool Errors)
+        let searchContext = "";
+        try {
+            // Buscamos forzando a resultados inmobilliarios para Maracaibo/Zulia
+            const searchQuery = encodeURIComponent(query + ' (inmobilia OR conlallave OR encuentra24 OR mercadolibre Zulia)');
+            const url = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
+            const res = await fetch(url, { 
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36' 
+                } 
+            });
+            const html = await res.text();
+            
+            const $ = cheerio.load(html);
+            const results: string[] = [];
+            
+            $('.result').slice(0, 8).each((_, el) => {
+                const title = $(el).find('.result__title').text().trim();
+                const link = $(el).find('.result__url').attr('href') || '';
+                const snippet = $(el).find('.result__snippet').text().trim();
+                
+                if (title && snippet) {
+                    results.push(`TÍTULO: ${title}\nURL: ${link}\nDESCRIPCIÓN: ${snippet}`);
+                }
+            });
+
+            if (results.length === 0) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ error: 'No se encontraron resultados en la web para esta consulta.' }),
+                };
+            }
+
+            searchContext = results.join('\n\n---\n\n');
+        } catch (err: any) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ error: 'Error extrayendo datos de internet', details: err.message }),
+            };
+        }
+
+        // 2. Inteligencia Artificial (Análisis del contexto en texto plano, sin tools)
         const systemInstructions = `
-Actúa como un agresivo analista experto en captación inmobiliaria. 
-Tu misión es ejecutar una búsqueda en internet y extraer las propiedades encontradas basado en la consulta del usuario.
-Encuentra propiedades (preferiblemente trato directo o dueño directo) usando la herramienta de Búsqueda de Google.
-Extrae los datos y deduce lógicamente si el contacto publicado es DUEÑO DIRECTO o una AGENCIA/ASESOR camuflado.
-
-REGLAS DE BÚSQUEDA:
-- Solo devuelve propiedades reales publicadas recientemente.
-- Explora portales como conlallave, encuentra24, mercadolibre, inmobilia, o agrupadores.
-- Excluye resultados basura o enlaces genéricos.
-
-REGLAS PARA EL VEREDICTO (isAgent):
-- Sé muy desconfiado. Si ves palabras clave como: "agencia", "asesores", "REMAX", "Century21", "afiliado", "Código", "honorarios", pon isAgent: true.
-- Si ves frases como: "trato directo", "mi casa", "dueño", pon isAgent: false.
+Actúa como un experto analista inmobiliario cazador de propiedades.
+A continuación recibirás una lista de resultados extraídos de la web (títulos, descripciones cortas y URLs).
+Determina cuáles son publicaciones reales valiosas (preferiblemente trato directo) basándonos en tu análisis.
 
 ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
 [
   {
-    "title": "Un título corto inferido sobre el inmueble",
-    "price": "Precio extraído (ej. $35,000) o 'No publicado'",
-    "url": "El enlace web de origen hacia la propiedad encontrada",
+    "title": "Un título corto del inmueble extraído de la descripción",
+    "price": "Precio inferido o 'No publicado'",
+    "url": "Extrae la URL exacta proporcionada en el bloque",
     "isAgent": true o false,
-    "reasoning": "Explicación breve de por qué crees que es dueño o agencia",
-    "hookMessage": "Mensaje corto de WhatsApp. Si es DUEÑO DIRECTO: preséntate sugerentemente como experto de Lago Realty ofreciendo ayuda o tu cartera de clientes para vender su casa rápido. NUNCA OFREZCAS COMPRARLA TÚ MISMO. Si es ASESOR: sugiere amablemente una posible alianza. Incluye placeholders como [Tu Nombre]."
+    "reasoning": "Por qué crees, según la descripción, que es dueño (isAgent=false) o agencia/asesor (isAgent=true). Palabras clave asesor: rentahouse, remax, century21, honorarios, somos agencia.",
+    "hookMessage": "Mensaje corto de WhatsApp. Si es DUEÑO DIRECTO: preséntate sugerentemente como experto de nuestra agencia Lago Realty ofreciendo ayuda o tu cartera de clientes para vender su casa rápido. NUNCA OFREZCAS COMPRARLA TÚ MISMO. Si es ASESOR: sugiere una alianza táctica."
   }
 ]
-NO DEVUELVAS NADA MÁS QUE EL JSON (SIN FORMATO MARKDOWN NI NADA, SOLO ESCRITO COMO UN ARRAY JSON VÁLIDO).
+NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BASURA O ENLACES CAÍDOS).
 `;
 
-        const prompt = `REALIZA LA SIGUIENTE BÚSQUEDA INMOBILIARIA Y DEVUELVE MÁXIMO 5 PROSPECTOS ÚTILES:\n\n${query}`;
+        const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
 
+        // Intentamos el modelo avanzado primero, luego los estándar si el usuario tiene llaves gratuitas funcionales.
         const modelsToTry = [
-            'gemini-1.5-flash-latest',
-            'gemini-1.5-pro-latest'
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro'
         ];
 
         let lastError = "";
@@ -67,7 +107,6 @@ NO DEVUELVAS NADA MÁS QUE EL JSON (SIN FORMATO MARKDOWN NI NADA, SOLO ESCRITO C
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: systemInstructions }] },
                         contents: [{ parts: [{ text: prompt }] }],
-                        tools: [{ googleSearch: {} }],
                         generationConfig: {
                             response_mime_type: "application/json",
                             response_schema: {
@@ -115,8 +154,8 @@ NO DEVUELVAS NADA MÁS QUE EL JSON (SIN FORMATO MARKDOWN NI NADA, SOLO ESCRITO C
             return {
                 statusCode: 500,
                 body: JSON.stringify({ 
-                    error: 'Error al ejecutar la búsqueda automatizada con Gemini.',
-                    details: lastError 
+                    error: 'Error de Análisis de IA',
+                    details: 'Por favor verifica que la VITE_GEMINI_SCRAPER_API_KEY no esté vacía o bloqueada por Google. Errores internos: ' + lastError 
                 }),
             };
         }

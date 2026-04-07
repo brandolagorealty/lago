@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Globe, AlertTriangle, CheckCircle2, User, Building, MessageSquare, Copy, ExternalLink, Check } from 'lucide-react';
+import { Search, Globe, AlertTriangle, User, Building, MessageSquare, Copy, ExternalLink, Check } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
 interface ProspectResult {
@@ -39,11 +39,11 @@ export default function ProspectorModule() {
             const responseData = await response.json();
 
             if (!response.ok) {
-                throw new Error(responseData.details ? `${responseData.error}: ${responseData.details}` : (responseData.error || 'Error al buscar con IA'));
+                throw new Error(responseData.details ? `${responseData.error}: ${responseData.details}` : (responseData.error || 'Error al buscar en la web'));
             }
 
             if (!Array.isArray(responseData)) {
-                 throw new Error("El formato de respuesta de la IA es incorrecto.");
+                 throw new Error("El formato de respuesta es incorrecto.");
             }
 
             if (responseData.length === 0) {
@@ -72,10 +72,10 @@ export default function ProspectorModule() {
                 <div>
                     <h2 className="text-3xl font-serif font-bold text-slate-900 flex items-center gap-3">
                         <Search className="w-8 h-8 text-indigo-600" />
-                        Prospector Integrado
+                        Prospector Dedicado
                     </h2>
                     <p className="text-slate-500 mt-2 text-lg">
-                        Conectado a Google Search en vivo. Encuentra dueños directos vendiendo en portales públicos.
+                        Búsqueda agresiva en portales inmobiliarios para encontrar dueños directos usando Gemini 2.0.
                     </p>
                 </div>
             </div>
@@ -99,9 +99,9 @@ export default function ProspectorModule() {
                         className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center gap-2 text-lg"
                     >
                         {loading ? (
-                            <><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Buscando...</>
+                            <><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Escaneando...</>
                         ) : (
-                            <><Search className="w-6 h-6" /> Escanear</>
+                            <><Search className="w-6 h-6" /> Buscar Prospectos</>
                         )}
                     </button>
                 </div>
@@ -126,7 +126,7 @@ export default function ProspectorModule() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className={`text-lg font-bold leading-tight truncate mb-1 ${result.isAgent ? 'text-red-900' : 'text-green-900'}`}>
-                                        {result.isAgent ? 'Agencia / Asesor Inmobiliario' : 'Dueño Directo'}
+                                        {result.isAgent ? 'Agencia / Comercializadora' : 'Dueño Directo Identificado'}
                                     </h4>
                                     <p className={`text-xs font-medium leading-relaxed ${result.isAgent ? 'text-red-600' : 'text-green-700'}`}>
                                         {result.reasoning}
@@ -137,7 +137,7 @@ export default function ProspectorModule() {
                             <div className="p-5 flex-1 flex flex-col gap-4">
                                 <div className="flex justify-between items-start gap-4">
                                     <div>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Inmueble</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Inmueble Detectado</p>
                                         <h5 className="font-semibold text-slate-800 line-clamp-2 leading-tight">{result.title}</h5>
                                     </div>
                                     <div className="text-right shrink-0">
@@ -148,7 +148,7 @@ export default function ProspectorModule() {
 
                                 <a href={result.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 font-bold hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors mt-auto w-max">
                                     <ExternalLink className="w-4 h-4" />
-                                    Ver Origen en Web
+                                    Abrir Anuncio Original
                                 </a>
                             </div>
 
@@ -156,14 +156,14 @@ export default function ProspectorModule() {
                                 <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-white">
                                     <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
                                         <MessageSquare className="w-4 h-4 text-slate-400" />
-                                        Rompehielos Generado
+                                        Guion Rompehielos Generado
                                     </div>
                                     <button 
                                         onClick={() => copyToClipboard(result.hookMessage, index)}
                                         className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors bg-white px-2.5 py-1.5 border border-slate-200 rounded-md shadow-sm hover:border-indigo-200 hover:bg-indigo-50"
                                     >
                                         {copiedIndex === index ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                        {copiedIndex === index ? 'Copiado' : 'Copiar'}
+                                        {copiedIndex === index ? 'Copiado' : 'Copiar para WhatsApp'}
                                     </button>
                                 </div>
                                 <div className="p-4">
@@ -178,9 +178,9 @@ export default function ProspectorModule() {
             ) : !loading && !error && (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                     <Globe className="w-24 h-24 text-slate-200 mb-6" />
-                    <h3 className="text-2xl font-serif font-bold text-slate-600 mb-2">Esperando Consulta</h3>
+                    <h3 className="text-2xl font-serif font-bold text-slate-600 mb-2">Motor de Búsqueda Proxy</h3>
                     <p className="max-w-md text-center text-slate-500">
-                        Escribe qué tipo de propiedad estás buscando captar y la inteligencia artificial rastreará la red para traerte los mejores prospectos dueños directos clasificados.
+                        Escribe qué propiedad estás buscando. La aplicación leerá los resultados y Gemini analizará las publicaciones para encontrar a los verdaderos dueños directos.
                     </p>
                 </div>
             )}
