@@ -55,7 +55,7 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
     `;
 
         const modelsToTry = [
-            'gemini- flash-latest',
+            'gemini-flash-latest',
             'gemini-1.5-flash-latest',
             'gemini-2.0-flash-exp',
             'gemini-1.5-flash'
