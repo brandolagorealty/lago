@@ -48,8 +48,9 @@ NO DEVUELVAS NADA MÁS QUE EL JSON (SIN FORMATO MARKDOWN NI NADA, SOLO ESCRITO C
         const prompt = `REALIZA LA SIGUIENTE BÚSQUEDA INMOBILIARIA Y DEVUELVE MÁXIMO 5 PROSPECTOS ÚTILES:\n\n${query}`;
 
         const modelsToTry = [
-            'gemini-1.5-flash-latest',
-            'gemini-1.5-pro-latest'
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-1.5-flash-latest' // fallback if the others fail
         ];
 
         let lastError = "";
