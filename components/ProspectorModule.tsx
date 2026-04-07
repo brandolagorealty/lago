@@ -162,16 +162,16 @@ export default function ProspectorModule() {
                         {result ? (
                             <div className="p-8 space-y-8">
                                 {/* Veredicto */}
-                                <div className={\`p-6 rounded-xl border \${result.isAgent ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}\`}>
+                                <div className={`p-6 rounded-xl border ${result.isAgent ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
                                     <div className="flex items-start gap-4">
-                                        <div className={\`p-3 rounded-full \${result.isAgent ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}\`}>
+                                        <div className={`p-3 rounded-full ${result.isAgent ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                             {result.isAgent ? <Building className="w-8 h-8" /> : <User className="w-8 h-8" />}
                                         </div>
                                         <div>
-                                            <h3 className={\`text-xl font-bold \${result.isAgent ? 'text-red-900' : 'text-green-900'}\`}>
+                                            <h3 className={`text-xl font-bold ${result.isAgent ? 'text-red-900' : 'text-green-900'}`}>
                                                 {result.isAgent ? '¡Alerta! Probablemente es una Agencia' : '¡Trato Directo! (Dueño)'}
                                             </h3>
-                                            <p className={\`mt-1 text-sm \${result.isAgent ? 'text-red-700' : 'text-green-700'}\`}>
+                                            <p className={`mt-1 text-sm ${result.isAgent ? 'text-red-700' : 'text-green-700'}`}>
                                                 {result.reasoning}
                                             </p>
                                         </div>
