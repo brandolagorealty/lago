@@ -6,7 +6,7 @@ export const handler = async (event: any) => {
 
     try {
         const { userMessage, properties, chatHistory, language } = JSON.parse(event.body);
-        const API_KEY = process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_API_KEY;
+        const API_KEY = process.env.VITE_GEMINI_CHAT_KEY || process.env.VITE_GEMINI_API_KEY;
         const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
         const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
         const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -15,7 +15,7 @@ export const handler = async (event: any) => {
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Falta la API Key en Netlify.' }),
+                body: JSON.stringify({ error: 'Falta la API Key del Chat (VITE_GEMINI_CHAT_KEY) en Netlify.' }),
             };
         }
 
@@ -65,106 +65,97 @@ export const handler = async (event: any) => {
       REPLY AS LAGUIA:
     `;
 
-        const modelsToTry = [
-            'liquid/lfm-2.5-1.2b-instruct:free',
-            'openrouter/free'
-        ];
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 22000);
 
-        let lastError = "";
+            // Build history in Gemini format
+            const geminiContents = [
+                { role: 'user', parts: [{ text: systemInstructions }] },
+                { role: 'model', parts: [{ text: 'Entendido. Estoy listo para asistir.' }] },
+                ...(chatHistory || []).map((m: any) => ({
+                    role: m.role === 'user' ? 'user' : 'model',
+                    parts: [{ text: m.text }]
+                })),
+                { role: 'user', parts: [{ text: prompt }] }
+            ];
 
-        for (const modelName of modelsToTry) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 22000);
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                signal: controller.signal,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: geminiContents,
+                    generationConfig: { temperature: 0.9 }
+                })
+            });
 
-                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'HTTP-Referer': 'https://lago-realty.netlify.app',
-                        'X-Title': 'Lago Realty Hub',
-                        'Content-Type': 'application/json' 
-                    },
-                    body: JSON.stringify({
-                        model: modelName,
-                        messages: [
-                            { role: "system", content: systemInstructions },
-                            { role: "user", content: prompt }
-                        ]
-                    })
-                });
+            clearTimeout(timeoutId);
+            const data = await response.json();
 
-                clearTimeout(timeoutId);
+            if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                const responseText = data.candidates[0].content.parts[0].text;
 
-                const data = await response.json();
+                // LaGuia replies in plain text (not JSON), so return directly
+                const reply = responseText.trim();
 
-                if (response.ok && data.choices?.[0]?.message?.content) {
-                    const responseText = data.choices[0].message.content;
-                    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                    
-                    if (!jsonMatch) {
-                        lastError += `[${modelName}]: No valid JSON found. Response: ${responseText.substring(0, 50)}... `;
-                        continue;
-                    }
+                // Try to extract lead info heuristically for Supabase saving
+                const nameLine = reply.match(/nombre[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s[A-ZÁÉÍÓÚ][a-záéíóú]+)?)/i);
+                const phoneLine = reply.match(/(\+?\d[\d\s\-]{6,14}\d)/);
+                const emailLine = reply.match(/([\w._%+-]+@[\w.-]+\.[a-z]{2,})/i);
 
-                    const result = JSON.parse(jsonMatch[0]);
-                    const { reply, leadInfo } = result;
+                if (nameLine && phoneLine && emailLine && SUPABASE_URL && SUPABASE_KEY) {
+                    try {
+                        await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': SUPABASE_KEY,
+                                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                                'Prefer': 'return=minimal'
+                            },
+                            body: JSON.stringify({
+                                name: nameLine[1],
+                                phone: phoneLine[1],
+                                email: emailLine[1],
+                                intent: 'Captado vía Chat LaGuia',
+                                chat_summary: (chatHistory || []).map((m: any) => m.text).join('\n')
+                            })
+                        });
 
-                    // Intento de guardar Lead (solo si están los 3 datos principales)
-                    if (leadInfo?.name && leadInfo?.phone && leadInfo?.email && SUPABASE_URL && SUPABASE_KEY) {
-                        try {
-                            await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+                        if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+                            const message = `🔔 *¡Nuevo Lead!*\n👤 ${nameLine[1]}\n📞 ${phoneLine[1]}\n📧 ${emailLine[1]}`;
+                            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                                 method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'apikey': SUPABASE_KEY,
-                                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                                    'Prefer': 'return=minimal'
-                                },
-                                body: JSON.stringify({
-                                    name: leadInfo.name,
-                                    phone: leadInfo.phone,
-                                    email: leadInfo.email,
-                                    intent: leadInfo.intent || 'No especificado',
-                                    chat_summary: (chatHistory || []).map((m: any) => m.text).join('\n')
-                                })
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: 'Markdown' })
                             });
-
-                            if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-                                const message = `🔔 *¡Nuevo Lead Capturado!*\n\n👤 *Nombre:* ${leadInfo.name}\n📞 *Teléfono:* ${leadInfo.phone}\n📧 *Email:* ${leadInfo.email}\n🏠 *Intención:* ${leadInfo.intent || 'Desconocida'}\n\n✨ *LaGuia* lo ha logrado.`;
-                                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: 'Markdown' })
-                                });
-                            }
-                        } catch (leadError) {
-                            console.error('Error guardando lead:', leadError);
                         }
+                    } catch (leadError) {
+                        console.error('Error guardando lead:', leadError);
                     }
+                }
 
-                    return {
-                        statusCode: 200,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ reply }),
-                    };
-                } else {
-                    lastError += `[${modelName}]: ${data.error?.message || 'Error desconocido'}. `;
-                }
-            } catch (err: any) {
-                if (err.name === 'AbortError') {
-                    lastError += `[${modelName}]: Timeout (Cola de IA gratuita). `;
-                } else {
-                    lastError += `[${modelName}]: ${err.message}. `;
-                }
+                return {
+                    statusCode: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reply }),
+                };
+            } else {
+                const errMsg = data.error?.message || JSON.stringify(data);
+                return {
+                    statusCode: 500,
+                    body: JSON.stringify({ error: 'Error de Gemini Chat', details: errMsg }),
+                };
             }
+        } catch (err: any) {
+            const isTimeout = err.name === 'AbortError';
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ error: isTimeout ? 'Tiempo de espera agotado' : 'Error de red', details: err.message }),
+            };
         }
-
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Sobrecarga de IA Gratuita", details: "Los servidores de OpenRouter están muy congestionados y la respuesta tomó más de 10 segundos. Se cortó la conexión. " + lastError }),
-        };
 
     } catch (error: any) {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };

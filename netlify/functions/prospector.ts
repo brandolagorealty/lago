@@ -12,13 +12,12 @@ export const handler = async (event: any) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'Consulta vacía.' }) };
         }
         
-        // Usamos la llave de OpenRouter prioritariamente
-        const API_KEY = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        const API_KEY = process.env.VITE_GEMINI_PROSPECTOR_KEY || process.env.VITE_GEMINI_API_KEY;
 
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Falta la API Key en Netlify.' }),
+                body: JSON.stringify({ error: 'Falta la API Key del Prospector (VITE_GEMINI_PROSPECTOR_KEY) en Netlify.' }),
             };
         }
 
@@ -85,77 +84,56 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
 
         const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
 
-        const modelsToTry = [
-            'liquid/lfm-2.5-1.2b-instruct:free',
-            'openrouter/free'
-        ];
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 22000);
 
-        let lastError = "";
-        let success = false;
-        let resultData = null;
-
-        for (const modelName of modelsToTry) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 22000);
-                
-                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'HTTP-Referer': 'https://lago-realty.netlify.app',
-                        'X-Title': 'Lago Realty Hub',
-                        'Content-Type': 'application/json' 
-                    },
-                    body: JSON.stringify({
-                        model: modelName,
-                        messages: [
-                            { role: "system", content: systemInstructions },
-                            { role: "user", content: prompt }
-                        ]
-                    })
-                });
-                
-                clearTimeout(timeoutId);
-
-                const data = await response.json();
-
-                if (response.ok && data.choices?.[0]?.message?.content) {
-                    let responseText = data.choices[0].message.content;
-                    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-                    if (jsonMatch) {
-                        resultData = JSON.parse(jsonMatch[0]);
-                        success = true;
-                        break;
-                    } else {
-                        lastError += `[${modelName}]: No valid JSON array found. Response: ${responseText.substring(0,50)}... `;
-                    }
-                } else {
-                    lastError += `[${modelName}]: ${data.error?.message || JSON.stringify(data)}. `;
-                }
-            } catch (err: any) {
-                if (err.name === 'AbortError') {
-                    lastError += `[${modelName}]: Timeout (Cola de OpenRouter excesiva). `;
-                } else {
-                    lastError += `[${modelName}]: ${err.message}. `;
-                }
-            }
-        }
-
-        if (success) {
-            return {
-                statusCode: 200,
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(resultData),
-            };
-        } else {
+                body: JSON.stringify({
+                    contents: [
+                        { role: 'user', parts: [{ text: systemInstructions + '\n\n' + prompt }] }
+                    ],
+                    generationConfig: {
+                        temperature: 0.4,
+                        responseMimeType: 'application/json'
+                    }
+                })
+            });
+
+            clearTimeout(timeoutId);
+            const data = await response.json();
+
+            if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                const responseText = data.candidates[0].content.parts[0].text;
+                const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    return {
+                        statusCode: 200,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: jsonMatch[0],
+                    };
+                } else {
+                    return {
+                        statusCode: 500,
+                        body: JSON.stringify({ error: 'Respuesta de IA inválida', details: responseText.substring(0, 100) }),
+                    };
+                }
+            } else {
+                const errMsg = data.error?.message || JSON.stringify(data);
+                return {
+                    statusCode: 500,
+                    body: JSON.stringify({ error: 'Error de Gemini Prospector', details: errMsg }),
+                };
+            }
+        } catch (err: any) {
+            const isTimeout = err.name === 'AbortError';
             return {
                 statusCode: 500,
-                body: JSON.stringify({ 
-                    error: 'Sobrecarga de IA Gratuita',
-                    details: 'Los servidores gratuitos de OpenRouter están congestionados y la app cortó la espera tras 10s para proteger Netlify. ' + lastError 
-                }),
+                body: JSON.stringify({ error: isTimeout ? 'Tiempo de espera agotado' : 'Error de red', details: err.message }),
             };
         }
     } catch (error: any) {
