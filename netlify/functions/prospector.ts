@@ -12,8 +12,8 @@ export const handler = async (event: any) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'Consulta vacía.' }) };
         }
         
-        // Usamos la llave de OpenRouter prioritariamente, o caemos en las de Gemini si estaban (migración)
-        const API_KEY = process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        // Usamos la llave de OpenRouter prioritariamente
+        const API_KEY = process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || process.env.VITE_GEMINI_SCRAPER_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
         if (!API_KEY) {
             return {
@@ -86,9 +86,8 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
         const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
 
         const modelsToTry = [
-            'google/gemini-2.0-flash-lite-preview-02-05:free',
-            'google/gemini-2.0-pro-exp-02-05:free',
-            'meta-llama/llama-3.3-70b-instruct:free'
+            'liquid/lfm-2.5-1.2b-instruct:free',
+            'openrouter/free'
         ];
 
         let lastError = "";
@@ -97,8 +96,12 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
 
         for (const modelName of modelsToTry) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 22000);
+                
                 const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: { 
                         'Authorization': `Bearer ${API_KEY}`,
                         'HTTP-Referer': 'https://lago-realty.netlify.app',
@@ -113,6 +116,8 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
                         ]
                     })
                 });
+                
+                clearTimeout(timeoutId);
 
                 const data = await response.json();
 
@@ -130,7 +135,11 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
                     lastError += `[${modelName}]: ${data.error?.message || JSON.stringify(data)}. `;
                 }
             } catch (err: any) {
-                lastError += `[${modelName}]: ${err.message}. `;
+                if (err.name === 'AbortError') {
+                    lastError += `[${modelName}]: Timeout (Cola de OpenRouter excesiva). `;
+                } else {
+                    lastError += `[${modelName}]: ${err.message}. `;
+                }
             }
         }
 
@@ -144,8 +153,8 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
             return {
                 statusCode: 500,
                 body: JSON.stringify({ 
-                    error: 'Error de Análisis de IA',
-                    details: 'Por favor verifica que la VITE_GEMINI_SCRAPER_API_KEY no esté vacía o bloqueada por Google. Errores internos: ' + lastError 
+                    error: 'Sobrecarga de IA Gratuita',
+                    details: 'Los servidores gratuitos de OpenRouter están congestionados y la app cortó la espera tras 10s para proteger Netlify. ' + lastError 
                 }),
             };
         }

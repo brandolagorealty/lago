@@ -66,17 +66,20 @@ export const handler = async (event: any) => {
     `;
 
         const modelsToTry = [
-            'google/gemini-2.0-flash-lite-preview-02-05:free',
-            'google/gemini-2.0-pro-exp-02-05:free',
-            'meta-llama/llama-3.3-70b-instruct:free'
+            'liquid/lfm-2.5-1.2b-instruct:free',
+            'openrouter/free'
         ];
 
         let lastError = "";
 
         for (const modelName of modelsToTry) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 22000);
+
                 const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: { 
                         'Authorization': `Bearer ${API_KEY}`,
                         'HTTP-Referer': 'https://lago-realty.netlify.app',
@@ -91,6 +94,8 @@ export const handler = async (event: any) => {
                         ]
                     })
                 });
+
+                clearTimeout(timeoutId);
 
                 const data = await response.json();
 
@@ -148,13 +153,17 @@ export const handler = async (event: any) => {
                     lastError += `[${modelName}]: ${data.error?.message || 'Error desconocido'}. `;
                 }
             } catch (err: any) {
-                lastError += `[${modelName}]: ${err.message}. `;
+                if (err.name === 'AbortError') {
+                    lastError += `[${modelName}]: Timeout (Cola de IA gratuita). `;
+                } else {
+                    lastError += `[${modelName}]: ${err.message}. `;
+                }
             }
         }
 
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: "Error en LaGuia", details: lastError }),
+            body: JSON.stringify({ error: "Sobrecarga de IA Gratuita", details: "Los servidores de OpenRouter están muy congestionados y la respuesta tomó más de 10 segundos. Se cortó la conexión. " + lastError }),
         };
 
     } catch (error: any) {

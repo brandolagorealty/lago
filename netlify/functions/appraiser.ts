@@ -55,9 +55,8 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
     `;
 
         const modelsToTry = [
-            'google/gemini-2.0-flash-lite-preview-02-05:free',
-            'google/gemini-2.0-pro-exp-02-05:free',
-            'meta-llama/llama-3.3-70b-instruct:free'
+            'liquid/lfm-2.5-1.2b-instruct:free',
+            'openrouter/free'
         ];
 
         let lastError = "";
@@ -66,8 +65,12 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
 
         for (const modelName of modelsToTry) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 22000);
+
                 const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: { 
                         'Authorization': `Bearer ${API_KEY}`,
                         'HTTP-Referer': 'https://lago-realty.netlify.app',
@@ -82,6 +85,8 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                         ]
                     })
                 });
+
+                clearTimeout(timeoutId);
 
                 const data = await response.json();
 
@@ -102,7 +107,11 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                     console.warn(`Model ${modelName} failed:`, data.error?.message || data);
                 }
             } catch (err: any) {
-                lastError += `[${modelName}]: ${err.message}. `;
+                if (err.name === 'AbortError') {
+                    lastError += `[${modelName}]: Timeout (Cola de IA gratuita). `;
+                } else {
+                    lastError += `[${modelName}]: ${err.message}. `;
+                }
                 console.error(`Error with model ${modelName}:`, err);
             }
         }
@@ -117,8 +126,8 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
             return {
                 statusCode: 500,
                 body: JSON.stringify({ 
-                    error: 'Error al conectar con Gemini tras varios intentos.',
-                    details: lastError 
+                    error: 'Sobrecarga de IA Gratuita',
+                    details: 'Los servidores de OpenRouter están muy congestionados y la respuesta tomó más de 10 segundos. Se cortó la conexión. ' + lastError 
                 }),
             };
         }
