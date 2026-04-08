@@ -57,10 +57,10 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
     `;
 
         const modelsToTry = [
-            'gemini-1.5-flash-latest',
-            'gemini-flash-latest',
+            'gemini-1.5-flash-8b',
+            'gemini-1.5-flash',
             'gemini-2.0-flash-exp',
-            'gemini-1.5-flash'
+            'gemini-1.5-pro'
         ];
 
         let lastError = "";
@@ -72,16 +72,20 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                 const cleanModelName = modelName.trim().replace(' ', '');
                 const URL = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${API_KEY}`;
                 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 18000); // 18s por intento
+
                 const response = await fetch(URL, {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: systemInstructions }] },
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: {
                             temperature: 0.4,
-                            response_mime_type: "application/json",
-                            response_schema: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
                                 type: "object",
                                 properties: {
                                     markdownReport: { type: "string" },
@@ -101,6 +105,7 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                     })
                 });
 
+                clearTimeout(timeoutId);
                 const data = await response.json();
 
                 if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -116,7 +121,8 @@ Redacta el informe de valoración siguiendo estrictamente el esquema JSON solici
                     console.warn(`Model ${cleanModelName} failed:`, errMsg);
                 }
             } catch (err: any) {
-                lastError += `[${modelName}]: ${err.message}. `;
+                const isTimeout = err.name === 'AbortError';
+                lastError += `[${modelName}]: ${isTimeout ? 'Timeout' : err.message}. `;
                 console.error(`Error with model ${modelName}:`, err);
             }
         }
