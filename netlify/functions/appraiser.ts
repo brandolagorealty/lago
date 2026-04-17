@@ -6,13 +6,14 @@ export const handler = async (event: any) => {
     try {
         const { ubicacion, superficie, distribucion, estado, extras } = JSON.parse(event.body);
         
-        // Use dedicated appraiser key if available, otherwise fall back to common Gemini key
-        const API_KEY = process.env.VITE_GEMINI_APPRAISER_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        // Priority: new unified key > old dedicated appraiser key
+        const API_KEY = process.env.GEMINI_API_KEY 
+                     || process.env.VITE_GEMINI_APPRAISER_KEY;
 
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Falta la API Key de Gemini en Netlify (VITE_GEMINI_APPRAISER_KEY).' }),
+                body: JSON.stringify({ error: 'Falta la API Key de Gemini. Configura GEMINI_API_KEY en Netlify.' }),
             };
         }
 
@@ -56,92 +57,130 @@ DATOS DE INSPECCIÓN DEL INMUEBLE:
 Redacta el informe de valoración siguiendo estrictamente el esquema JSON solicitado y las instrucciones de experto.
     `;
 
+        // Fallback chain: newest → oldest. Whatever the API key supports, one will work.
         const modelsToTry = [
-            'gemini-1.5-flash-8b',
-            'gemini-1.5-flash',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-pro'
+            'gemini-2.5-flash',       // Newest & best (if available)
+            'gemini-2.5-flash-lite',  // Fast & cheap tier
+            'gemini-2.0-flash',       // Stable previous gen
+            'gemini-1.5-flash',       // Older but widely supported
+            'gemini-1.5-flash-8b',    // Smallest, guaranteed to exist
         ];
 
+        // JSON schema for structured output (used by models that support it)
+        const jsonSchema = {
+            type: "object",
+            properties: {
+                markdownReport: { type: "string" },
+                suggestedValue: {
+                    type: "object",
+                    properties: {
+                        base: { type: "integer" },
+                        high: { type: "integer" },
+                        low: { type: "integer" }
+                    },
+                    required: ["base", "high", "low"]
+                }
+            },
+            required: ["markdownReport", "suggestedValue"]
+        };
+
         let lastError = "";
-        let success = false;
         let resultData = null;
 
         for (const modelName of modelsToTry) {
             try {
-                const cleanModelName = modelName.trim().replace(' ', '');
-                const URL = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${API_KEY}`;
+                console.log(`[Appraiser] Trying model: ${modelName}`);
+
+                // Try v1beta first (supports more features), fall back to v1
+                const apiVersions = ['v1beta', 'v1'];
                 
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 18000); // 18s por intento
+                for (const apiVersion of apiVersions) {
+                    try {
+                        const URL = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${API_KEY}`;
+                        
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s per attempt
 
-                const response = await fetch(URL, {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        system_instruction: { parts: [{ text: systemInstructions }] },
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            temperature: 0.4,
-                            responseMimeType: "application/json",
-                            responseSchema: {
-                                type: "object",
-                                properties: {
-                                    markdownReport: { type: "string" },
-                                    suggestedValue: {
-                                        type: "object",
-                                        properties: {
-                                            base: { type: "integer" },
-                                            high: { type: "integer" },
-                                            low: { type: "integer" }
-                                        },
-                                        required: ["base", "high", "low"]
-                                    }
-                                },
-                                required: ["markdownReport", "suggestedValue"]
+                        const requestBody: any = {
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                temperature: 0.4,
+                                responseMimeType: "application/json",
                             }
+                        };
+
+                        // Add system instruction (supported in v1beta)
+                        if (apiVersion === 'v1beta') {
+                            requestBody.system_instruction = { parts: [{ text: systemInstructions }] };
+                            requestBody.generationConfig.responseSchema = jsonSchema;
+                        } else {
+                            // v1: embed system instructions in the prompt
+                            requestBody.contents[0].parts[0].text = systemInstructions + '\n\n' + prompt;
                         }
-                    })
-                });
 
-                clearTimeout(timeoutId);
-                const data = await response.json();
+                        const response = await fetch(URL, {
+                            method: 'POST',
+                            signal: controller.signal,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody)
+                        });
 
-                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    let text = data.candidates[0].content.parts[0].text;
-                    // Limpieza de posibles bloques de código markdown
-                    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                    resultData = JSON.parse(text);
-                    success = true;
-                    break;
-                } else {
-                    const errMsg = data.error?.message || JSON.stringify(data);
-                    lastError += `[${cleanModelName}]: ${errMsg}. `;
-                    console.warn(`Model ${cleanModelName} failed:`, errMsg);
+                        clearTimeout(timeoutId);
+                        const data = await response.json();
+
+                        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                            let text = data.candidates[0].content.parts[0].text;
+                            // Clean potential markdown code blocks
+                            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                            resultData = JSON.parse(text);
+                            
+                            // Validate the response has the required shape
+                            if (resultData.markdownReport && resultData.suggestedValue?.base) {
+                                console.log(`[Appraiser] Success with ${modelName} (${apiVersion})`);
+                                return {
+                                    statusCode: 200,
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(resultData),
+                                };
+                            } else {
+                                lastError += `[${modelName}/${apiVersion}]: Response missing required fields. `;
+                                continue;
+                            }
+                        } else {
+                            const errMsg = data.error?.message || JSON.stringify(data).substring(0, 200);
+                            
+                            // If model not found in v1beta, don't bother trying v1 for same model
+                            if (errMsg.includes('not found') || errMsg.includes('not supported')) {
+                                lastError += `[${modelName}]: Model not available. `;
+                                break; // Skip to next model
+                            }
+                            
+                            lastError += `[${modelName}/${apiVersion}]: ${errMsg}. `;
+                        }
+                    } catch (innerErr: any) {
+                        if (innerErr.name === 'AbortError') {
+                            lastError += `[${modelName}/${apiVersion}]: Timeout. `;
+                        } else if (innerErr instanceof SyntaxError) {
+                            lastError += `[${modelName}/${apiVersion}]: Invalid JSON in response. `;
+                        } else {
+                            lastError += `[${modelName}/${apiVersion}]: ${innerErr.message}. `;
+                        }
+                    }
                 }
             } catch (err: any) {
-                const isTimeout = err.name === 'AbortError';
-                lastError += `[${modelName}]: ${isTimeout ? 'Timeout' : err.message}. `;
+                lastError += `[${modelName}]: ${err.message}. `;
                 console.error(`Error with model ${modelName}:`, err);
             }
         }
 
-        if (success) {
-            return {
-                statusCode: 200,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(resultData),
-            };
-        } else {
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ 
-                    error: 'Error de conexión con la IA tras varios intentos.',
-                    details: 'No se pudo generar el reporte. ' + lastError 
-                }),
-            };
-        }
+        // All models failed
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ 
+                error: 'No se pudo conectar con la IA después de intentar todos los modelos disponibles.',
+                details: lastError 
+            }),
+        };
     } catch (error: any) {
         console.error("Function exception:", error);
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };

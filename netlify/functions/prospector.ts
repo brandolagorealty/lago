@@ -12,19 +12,19 @@ export const handler = async (event: any) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'Consulta vacía.' }) };
         }
         
-        const API_KEY = process.env.VITE_GEMINI_PROSPECTOR_KEY || process.env.VITE_GEMINI_API_KEY;
+        // Priority: new unified key > old dedicated prospector key
+        const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_PROSPECTOR_KEY;
 
         if (!API_KEY) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'Falta la API Key del Prospector (VITE_GEMINI_PROSPECTOR_KEY) en Netlify.' }),
+                body: JSON.stringify({ error: 'Falta la API Key de Gemini. Configura GEMINI_API_KEY en Netlify.' }),
             };
         }
 
-        // 1. Scraping Manual DuckDuckGo (Bypassing API Tool Errors)
+        // 1. Scraping Manual DuckDuckGo
         let searchContext = "";
         try {
-            // Buscamos forzando a resultados inmobilliarios para Maracaibo/Zulia
             const searchQuery = encodeURIComponent(query + ' (inmobilia OR conlallave OR encuentra24 OR mercadolibre Zulia)');
             const url = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
             const res = await fetch(url, { 
@@ -62,7 +62,7 @@ export const handler = async (event: any) => {
             };
         }
 
-        // 2. Inteligencia Artificial (Análisis del contexto en texto plano, sin tools)
+        // 2. AI Analysis with model fallback
         const systemInstructions = `
 Actúa como un experto analista inmobiliario cazador de propiedades.
 A continuación recibirás una lista de resultados extraídos de la web (títulos, descripciones cortas y URLs).
@@ -84,58 +84,74 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
 
         const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
 
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 22000);
+        // Fallback chain: newest → oldest
+        const modelsToTry = [
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-8b',
+        ];
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${API_KEY}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                signal: controller.signal,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [
-                        { role: 'user', parts: [{ text: systemInstructions + '\n\n' + prompt }] }
-                    ],
-                    generationConfig: {
-                        temperature: 0.4,
-                        responseMimeType: 'application/json'
+        let lastError = "";
+
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`[Prospector] Trying model: ${modelName}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    signal: controller.signal,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [
+                            { role: 'user', parts: [{ text: systemInstructions + '\n\n' + prompt }] }
+                        ],
+                        generationConfig: {
+                            temperature: 0.4,
+                            responseMimeType: 'application/json'
+                        }
+                    })
+                });
+
+                clearTimeout(timeoutId);
+                const data = await response.json();
+
+                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const responseText = data.candidates[0].content.parts[0].text;
+                    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+                    if (jsonMatch) {
+                        console.log(`[Prospector] Success with ${modelName}`);
+                        return {
+                            statusCode: 200,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: jsonMatch[0],
+                        };
+                    } else {
+                        lastError += `[${modelName}]: Invalid JSON response. `;
                     }
-                })
-            });
-
-            clearTimeout(timeoutId);
-            const data = await response.json();
-
-            if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                const responseText = data.candidates[0].content.parts[0].text;
-                const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-                if (jsonMatch) {
-                    return {
-                        statusCode: 200,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: jsonMatch[0],
-                    };
                 } else {
-                    return {
-                        statusCode: 500,
-                        body: JSON.stringify({ error: 'Respuesta de IA inválida', details: responseText.substring(0, 100) }),
-                    };
+                    const errMsg = data.error?.message || JSON.stringify(data).substring(0, 200);
+                    if (errMsg.includes('not found') || errMsg.includes('not supported')) {
+                        lastError += `[${modelName}]: Model not available. `;
+                        continue;
+                    }
+                    lastError += `[${modelName}]: ${errMsg}. `;
                 }
-            } else {
-                const errMsg = data.error?.message || JSON.stringify(data);
-                return {
-                    statusCode: 500,
-                    body: JSON.stringify({ error: 'Error de Gemini Prospector', details: errMsg }),
-                };
+            } catch (err: any) {
+                const isTimeout = err.name === 'AbortError';
+                lastError += `[${modelName}]: ${isTimeout ? 'Timeout' : err.message}. `;
             }
-        } catch (err: any) {
-            const isTimeout = err.name === 'AbortError';
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ error: isTimeout ? 'Tiempo de espera agotado' : 'Error de red', details: err.message }),
-            };
         }
+
+        // All models failed
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'No se pudo conectar con la IA después de intentar todos los modelos.', details: lastError }),
+        };
     } catch (error: any) {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
