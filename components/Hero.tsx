@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FilterState } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
-import { ZULIA_CITIES } from '../constants/locations';
+import { MARACAIBO_SECTORS } from '../constants/locations';
 
 interface HeroProps {
   onSearch: (filters: FilterState) => void;
@@ -61,7 +61,7 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
               onChange={(e) => setFilters({ ...filters, location: e.target.value })}
             >
               <option value="">{t.hero.search.locationPlaceholder}</option>
-              {ZULIA_CITIES.map((city) => (
+              {MARACAIBO_SECTORS.map((city) => (
                 <option key={city} value={city}>
                   {city}
                 </option>
@@ -73,7 +73,7 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
             <select
               className="bg-transparent text-brand-black font-semibold focus:outline-none appearance-none cursor-pointer"
               value={filters.type}
-              onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+              onChange={(e) => setFilters({ ...filters, type: e.target.value as any })}
             >
               <option value="Any Type">{t.hero.types.any}</option>
               <option value="House">{t.hero.types.house}</option>

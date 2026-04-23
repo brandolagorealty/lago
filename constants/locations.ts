@@ -1,11 +1,17 @@
-export const ZULIA_CITIES = [
-    'Maracaibo',
-    'San Francisco',
-    'Cabimas',
-    'Ciudad Ojeda',
+export const MARACAIBO_SECTORS = [
+    'La Lago',
+    'La Virginia',
+    'Las Mercedes',
+    'Tierra Negra',
+    'Bella Vista',
+    'El Milagro',
+    'San Jacinto',
+    'El Paraíso',
     'Santa Rita',
-    'Villa del Rosario',
-    'Machiques',
-    'La Concepción',
-    'Los Puertos de Altagracia'
+    'Indio Mara',
+    'Cecilio Acosta',
+    'La Limpia',
+    'Santa Lucía',
+    'Valle Frio',
+    'Juana de Avila'
 ];

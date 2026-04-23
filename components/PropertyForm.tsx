@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Property } from '../types';
 import { propertyService } from '../services/supabase';
 import { useLanguage } from '../i18n/LanguageContext';
-import { ZULIA_CITIES } from '../constants/locations';
+import { MARACAIBO_SECTORS } from '../constants/locations';
 import imageCompression from 'browser-image-compression';
 
 interface PropertyFormProps {
@@ -227,7 +227,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             >
               <option value="">{t.form.placeholders.location}</option>
-              {ZULIA_CITIES.map((city) => (
+              {MARACAIBO_SECTORS.map((city) => (
                 <option key={city} value={city}>
                   {city}
                 </option>

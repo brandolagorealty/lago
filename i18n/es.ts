@@ -27,7 +27,7 @@ export const es: Translations = {
         stats_volume: 'Volumen Gestionado',
         search: {
             location: 'Ubicación',
-            locationPlaceholder: 'Seleccionar Ciudad',
+            locationPlaceholder: 'Seleccionar Sector',
             type: 'Tipo de Propiedad',
             price: 'Precio Máximo',
             pricePlaceholder: 'Cualquier Precio',
@@ -77,7 +77,7 @@ export const es: Translations = {
             title: 'Título de la Propiedad',
             price: 'Precio (USD)',
             type: 'Tipo de Propiedad',
-            location: 'Ciudad',
+            location: 'Ubicación',
             beds: 'Habitaciones',
             baths: 'Baños',
             sqft: 'Metros Cuadrados',
@@ -86,7 +86,7 @@ export const es: Translations = {
         placeholders: {
             title: 'Villa de Lujo en Lago Mar Beach',
             price: '150000',
-            location: 'Selecciona Ciudad',
+            location: 'Selecciona Sector',
             description: 'Describe los puntos destacados de la propiedad...',
         },
         submit: 'Publicar Listado',
