@@ -39,7 +39,7 @@ function getGoogleCalendarClient() {
 /**
  * Envía un mensaje de WhatsApp usando la API de Meta.
  */
-async function sendWhatsAppMessage(toPhone, taskTitle, taskDescription, dueDate, taskLink) {
+async function sendWhatsAppMessage(toPhone, agentName, taskTitle, dueDate, taskLink) {
   const phoneId = process.env.META_PHONE_ID;
   const token = process.env.META_WHATSAPP_TOKEN;
   const templateName = process.env.META_TEMPLATE_NAME || 'alerta_tarea_pendiente';
@@ -73,8 +73,8 @@ async function sendWhatsAppMessage(toPhone, taskTitle, taskDescription, dueDate,
             {
               type: 'body',
               parameters: [
+                { type: 'text', text: agentName },
                 { type: 'text', text: taskTitle },
-                { type: 'text', text: taskDescription || 'Sin descripción adicional.' },
                 { type: 'text', text: dueDateFormatted },
                 { type: 'text', text: taskLink || 'https://lago-hub.netlify.app' },
               ],
@@ -195,8 +195,8 @@ exports.handler = async (event) => {
   // 6. Enviar mensaje de WhatsApp
   results.whatsapp = await sendWhatsAppMessage(
     agent.phone,
+    agent.name, // Añadimos el nombre para la plantilla
     task.title,
-    task.description,
     task.due_date,
     taskLink
   );

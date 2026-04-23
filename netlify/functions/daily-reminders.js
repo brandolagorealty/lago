@@ -22,7 +22,7 @@ function formatVenezuelaPhone(phone) {
 /**
  * Envía un recordatorio de tarea pendiente vía WhatsApp.
  */
-async function sendTaskReminder(phone, agentName, taskTitle, taskDescription, dueDate, taskLink) {
+async function sendTaskReminder(phone, agentName, taskTitle, dueDate, taskLink) {
   const phoneId = process.env.META_PHONE_ID;
   const token = process.env.META_WHATSAPP_TOKEN;
   const templateName = process.env.META_TEMPLATE_NAME || 'alerta_tarea_pendiente';
@@ -138,7 +138,6 @@ exports.handler = async () => {
       agent.phone,
       agent.name,
       task.title,
-      task.description,
       task.due_date,
       taskLink
     );
