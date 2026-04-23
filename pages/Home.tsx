@@ -20,6 +20,7 @@ const Home: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [filters, setFilters] = useState<FilterState>({
         type: 'Any Type',
+        listingType: 'any',
         minPrice: '',
         maxPrice: '',
         location: '',
@@ -101,7 +102,10 @@ const Home: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                         {isLoading
                             ? Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)
-                            : properties.filter(p => p.featured).slice(0, 4).map(property => (
+                            : (properties.filter(p => p.featured).length > 0 
+                                ? properties.filter(p => p.featured) 
+                                : properties
+                              ).slice(0, 4).map(property => (
                                 <PropertyCard key={property.id} property={property} />
                             ))
                         }
@@ -133,7 +137,7 @@ const Home: React.FC = () => {
             ) : (
                 <div className="bg-brand-white rounded-3xl p-16 text-center shadow-sm border border-brand-black/5">
                     <h3 className="text-2xl font-bold text-brand-black mb-2">{t.listings.noResults}</h3>
-                    <button onClick={() => setFilters({ type: 'Any Type', minPrice: '', maxPrice: '', location: '' })} className="text-brand-green font-bold hover:underline">
+                    <button onClick={() => setFilters({ type: 'Any Type', listingType: 'any', minPrice: '', maxPrice: '', location: '' })} className="text-brand-green font-bold hover:underline">
                         {t.listings.clearFilters}
                     </button>
                 </div>

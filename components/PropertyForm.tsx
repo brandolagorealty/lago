@@ -182,7 +182,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.form.labels.type}</label>
             <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20"
-              value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+              value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
               <option value="House">{t.hero.types.house}</option>
               <option value="Apartment">{t.hero.types.apartment}</option>
               <option value="Commercial">{t.hero.types.commercial}</option>
@@ -339,6 +339,20 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
                 <option value="sold">Vendida</option>
                 <option value="rented">Alquilada</option>
               </select>
+            </div>
+            <div className="space-y-2 flex items-center pt-6">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={formData.featured}
+                    onChange={e => setFormData({ ...formData, featured: e.target.checked })}
+                    className="peer sr-only"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-green"></div>
+                </div>
+                <span className="text-sm font-bold text-slate-700 group-hover:text-brand-green transition-colors">Propiedad Destacada</span>
+              </label>
             </div>
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold text-brand-green uppercase tracking-widest">Notas del Agente (Interno)</label>
