@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FilterState } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 import { MARACAIBO_SECTORS } from '../constants/locations';
+import CustomSelect from './CustomSelect';
 
 interface HeroProps {
   onSearch: (filters: FilterState) => void;
@@ -41,47 +42,35 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
 
         {/* Search Bar */}
         <div className="bg-brand-white/95 backdrop-blur-lg p-4 rounded-3xl shadow-2xl max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="flex flex-col text-left px-4 border-r border-brand-black/10 last:border-0">
-            <label className="text-[10px] font-bold text-brand-green uppercase tracking-widest mb-1">{t.hero.search.operation}</label>
-            <select
-              className="bg-transparent text-brand-black font-semibold focus:outline-none appearance-none cursor-pointer"
-              value={filters.listingType || 'any'}
-              onChange={(e) => setFilters({ ...filters, listingType: e.target.value as any })}
-            >
-              <option value="any">{t.hero.types.any}</option>
-              <option value="sale">{t.hero.types.sale}</option>
-              <option value="rent">{t.hero.types.rent}</option>
-            </select>
-          </div>
-          <div className="flex flex-col text-left px-4 border-r border-brand-black/10 last:border-0">
-            <label className="text-[10px] font-bold text-brand-green uppercase tracking-widest mb-1">{t.hero.search.location}</label>
-            <select
-              className="bg-transparent text-brand-black font-semibold focus:outline-none appearance-none cursor-pointer placeholder:text-brand-black/40"
-              value={filters.location}
-              onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-            >
-              <option value="">{t.hero.search.locationPlaceholder}</option>
-              {MARACAIBO_SECTORS.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col text-left px-4 border-r border-brand-black/10 last:border-0">
-            <label className="text-[10px] font-bold text-brand-green uppercase tracking-widest mb-1">{t.hero.search.type}</label>
-            <select
-              className="bg-transparent text-brand-black font-semibold focus:outline-none appearance-none cursor-pointer"
-              value={filters.type}
-              onChange={(e) => setFilters({ ...filters, type: e.target.value as any })}
-            >
-              <option value="Any Type">{t.hero.types.any}</option>
-              <option value="House">{t.hero.types.house}</option>
-              <option value="Apartment">{t.hero.types.apartment}</option>
-              <option value="Commercial">{t.hero.types.commercial}</option>
-              <option value="Land">{t.hero.types.land}</option>
-            </select>
-          </div>
+          <CustomSelect
+            label={t.hero.search.operation}
+            value={filters.listingType || 'any'}
+            options={[
+              { label: t.hero.types.any, value: 'any' },
+              { label: t.hero.types.sale, value: 'sale' },
+              { label: t.hero.types.rent, value: 'rent' },
+            ]}
+            onChange={(val) => setFilters({ ...filters, listingType: val as any })}
+          />
+          <CustomSelect
+            label={t.hero.search.location}
+            value={filters.location}
+            placeholder={t.hero.search.locationPlaceholder}
+            options={MARACAIBO_SECTORS.map(s => ({ label: s, value: s }))}
+            onChange={(val) => setFilters({ ...filters, location: val })}
+          />
+          <CustomSelect
+            label={t.hero.search.type}
+            value={filters.type}
+            options={[
+              { label: t.hero.types.any, value: 'Any Type' },
+              { label: t.hero.types.house, value: 'House' },
+              { label: t.hero.types.apartment, value: 'Apartment' },
+              { label: t.hero.types.commercial, value: 'Commercial' },
+              { label: t.hero.types.land, value: 'Land' },
+            ]}
+            onChange={(val) => setFilters({ ...filters, type: val as any })}
+          />
           <div className="flex flex-col text-left px-4 border-r border-brand-black/10 last:border-0">
             <label className="text-[10px] font-bold text-brand-green uppercase tracking-widest mb-1">{t.hero.search.price}</label>
             <input
