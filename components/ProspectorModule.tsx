@@ -1,27 +1,40 @@
 import React, { useState } from 'react';
-import { Search, Globe, AlertTriangle, User, Building, MessageSquare, Copy, ExternalLink, Check } from 'lucide-react';
+import { Search, Globe, AlertTriangle, User, Building, MapPin, Tag, Filter } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import { MARACAIBO_SECTORS } from '../constants/locations';
 
 interface ProspectResult {
   title: string;
   price: string;
   url: string;
   isAgent: boolean;
+  operacion: string;
   reasoning: string;
-  hookMessage: string;
 }
 
 export default function ProspectorModule() {
     const { session } = useAuth();
-    const [query, setQuery] = useState('');
+    
+    const [formData, setFormData] = useState({
+        operacion: 'Venta',
+        tipoInmueble: '',
+        ubicacion: '',
+        keywords: '',
+        soloDuenos: true
+    });
+
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<ProspectResult[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
+        setFormData({ ...formData, [e.target.name]: value });
+    };
 
     const processSearch = async () => {
-        if (!query.trim()) {
-            setError('Por favor ingresa una búsqueda válida.');
+        if (!formData.tipoInmueble) {
+            setError('Por favor selecciona un Tipo de Inmueble para iniciar la búsqueda.');
             return;
         }
 
@@ -29,11 +42,18 @@ export default function ProspectorModule() {
         setError(null);
         setResults([]);
 
+        let queryParts = [`"${formData.operacion} de ${formData.tipoInmueble}"`];
+        if (formData.ubicacion) queryParts.push(`"${formData.ubicacion}"`);
+        if (formData.soloDuenos) queryParts.push(`(trato directo OR dueño vende OR sin intermediarios)`);
+        if (formData.keywords) queryParts.push(formData.keywords);
+        
+        const finalQuery = queryParts.join(' ');
+
         try {
             const response = await fetch('/.netlify/functions/prospector', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: query })
+                body: JSON.stringify({ query: finalQuery })
             });
 
             const responseData = await response.json();
@@ -75,38 +95,72 @@ export default function ProspectorModule() {
                         Prospector Dedicado
                     </h2>
                     <p className="text-slate-500 mt-2 text-lg">
-                        Búsqueda agresiva en portales inmobiliarios para encontrar dueños directos usando Gemini 2.0.
+                        Búsqueda agresiva en portales inmobiliarios para encontrar dueños directos en tiempo real.
                     </p>
                 </div>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-                <div className="max-w-3xl mx-auto flex gap-4">
-                    <div className="flex-1 relative">
-                        <Globe className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Operación</label>
+                        <select name="operacion" value={formData.operacion} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
+                            <option value="Venta">Venta</option>
+                            <option value="Alquiler">Alquiler</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Inmueble</label>
+                        <select name="tipoInmueble" value={formData.tipoInmueble} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
+                            <option value="" disabled>Seleccionar...</option>
+                            <option value="Apartamento">Apartamento</option>
+                            <option value="Casa">Casa</option>
+                            <option value="Townhouse">Townhouse</option>
+                            <option value="Galpón">Galpón</option>
+                            <option value="Oficina">Oficina</option>
+                            <option value="Local Comercial">Local Comercial</option>
+                            <option value="Terreno">Terreno</option>
+                        </select>
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-400"/>Sector / Zona</label>
+                        <select name="ubicacion" value={formData.ubicacion} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
+                            <option value="">Cualquier sector (Búsqueda amplia)</option>
+                            {MARACAIBO_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex-1 w-full relative">
+                        <Tag className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                         <input
                             type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && processSearch()}
-                            placeholder="Ej: Apartamentos en alquiler zona norte trato directo..."
-                            className="w-full pl-14 pr-4 py-4 text-lg border-2 border-slate-200 rounded-2xl focus:ring-0 focus:border-indigo-500 transition-colors"
+                            name="keywords"
+                            value={formData.keywords}
+                            onChange={handleChange}
+                            placeholder="Palabras clave extra (Ej: amoblado, piscina)..."
+                            className="w-full pl-12 pr-4 py-3.5 text-md border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                         />
                     </div>
+                    <label className="flex items-center gap-3 cursor-pointer shrink-0 bg-indigo-50 px-4 py-3.5 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors">
+                        <input type="checkbox" name="soloDuenos" checked={formData.soloDuenos} onChange={handleChange} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500/20" />
+                        <span className="font-bold text-indigo-900 text-sm flex flex-col">Modo Francotirador <span className="text-xs font-medium text-indigo-500">Solo dueños directos</span></span>
+                    </label>
                     <button
                         onClick={processSearch}
-                        disabled={loading || !query.trim()}
-                        className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center gap-2 text-lg"
+                        disabled={loading || !formData.tipoInmueble}
+                        className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
                     >
                         {loading ? (
-                            <><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Escaneando...</>
+                            <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Buscando...</>
                         ) : (
-                            <><Search className="w-6 h-6" /> Buscar Prospectos</>
+                            <><Search className="w-5 h-5" /> Buscar</>
                         )}
                     </button>
                 </div>
                 {error && (
-                    <div className="max-w-3xl mx-auto mt-4 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3">
+                    <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3">
                         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                         <span className="font-medium text-sm">{error}</span>
                     </div>
@@ -138,6 +192,9 @@ export default function ProspectorModule() {
                                 <div className="flex justify-between items-start gap-4">
                                     <div>
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Inmueble Detectado</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${result.operacion === 'Venta' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{result.operacion}</span>
+                                        </div>
                                         <h5 className="font-semibold text-slate-800 line-clamp-2 leading-tight">{result.title}</h5>
                                     </div>
                                     <div className="text-right shrink-0">
@@ -150,27 +207,6 @@ export default function ProspectorModule() {
                                     <ExternalLink className="w-4 h-4" />
                                     Abrir Anuncio Original
                                 </a>
-                            </div>
-
-                            <div className="mt-auto border-t border-slate-100 bg-slate-50/50">
-                                <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-white">
-                                    <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
-                                        <MessageSquare className="w-4 h-4 text-slate-400" />
-                                        Guion Rompehielos Generado
-                                    </div>
-                                    <button 
-                                        onClick={() => copyToClipboard(result.hookMessage, index)}
-                                        className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 transition-colors bg-white px-2.5 py-1.5 border border-slate-200 rounded-md shadow-sm hover:border-indigo-200 hover:bg-indigo-50"
-                                    >
-                                        {copiedIndex === index ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                        {copiedIndex === index ? 'Copiado' : 'Copiar para WhatsApp'}
-                                    </button>
-                                </div>
-                                <div className="p-4">
-                                    <p className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed italic">
-                                        "{result.hookMessage}"
-                                    </p>
-                                </div>
                             </div>
                         </div>
                     ))}

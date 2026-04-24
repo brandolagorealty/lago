@@ -26,7 +26,7 @@ export const handler = async (event: any) => {
         let searchContext = "";
         try {
             const searchQuery = encodeURIComponent(query + ' (inmobilia OR conlallave OR encuentra24 OR mercadolibre Zulia)');
-            const url = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
+            const url = `https://html.duckduckgo.com/html/?q=${searchQuery}&df=m`;
             const res = await fetch(url, { 
                 headers: { 
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36' 
@@ -75,8 +75,8 @@ ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
     "price": "Precio inferido o 'No publicado'",
     "url": "Extrae la URL exacta proporcionada en el bloque",
     "isAgent": true o false,
-    "reasoning": "Por qué crees, según la descripción, que es dueño (isAgent=false) o agencia/asesor (isAgent=true). Palabras clave asesor: rentahouse, remax, century21, honorarios, somos agencia.",
-    "hookMessage": "Mensaje corto de WhatsApp. Si es DUEÑO DIRECTO: preséntate sugerentemente como experto de nuestra agencia Lago Realty ofreciendo ayuda o tu cartera de clientes para vender su casa rápido. NUNCA OFREZCAS COMPRARLA TÚ MISMO. Si es ASESOR: sugiere una alianza táctica."
+    "operacion": "'Venta' o 'Alquiler' inferido",
+    "reasoning": "Por qué crees, según la descripción, que es dueño (isAgent=false) o agencia/asesor (isAgent=true). Palabras clave asesor: rentahouse, remax, century21, honorarios, somos agencia."
   }
 ]
 NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BASURA O ENLACES CAÍDOS).
