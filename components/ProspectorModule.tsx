@@ -54,7 +54,7 @@ export default function ProspectorModule() {
             const response = await fetch('/.netlify/functions/prospector', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: finalQuery })
+                body: JSON.stringify({ query: finalQuery, operacion: formData.operacion })
             });
 
             const responseData = await response.json();

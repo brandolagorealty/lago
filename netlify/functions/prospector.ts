@@ -6,7 +6,7 @@ export const handler = async (event: any) => {
     }
 
     try {
-        const { query } = JSON.parse(event.body);
+        const { query, operacion } = JSON.parse(event.body || '{}');
 
         if (!query) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Consulta vacía.' }) };
@@ -26,7 +26,7 @@ export const handler = async (event: any) => {
         let searchContext = "";
         try {
             const searchQuery = encodeURIComponent(query + ' Zulia Venezuela');
-            const url = `https://html.duckduckgo.com/html/?q=${searchQuery}&df=m`;
+            const url = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
             const res = await fetch(url, { 
                 headers: { 
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36' 
@@ -68,7 +68,8 @@ Actúa como un experto analista inmobiliario cazador de propiedades.
 A continuación recibirás una lista de resultados extraídos de la web (títulos, descripciones cortas y URLs).
 Determina cuáles son publicaciones reales valiosas (preferiblemente trato directo) basándonos en tu análisis.
 
-REGLA ESTRICTA: DESCARTA Y ELIMINA CUALQUIER PROPIEDAD QUE NO ESTÉ EN MARACAIBO O EL ESTADO ZULIA (VENEZUELA). Si el texto menciona otros países (ej. Chile, México) o ciudades fuera del Zulia, ignóralo por completo.
+REGLA ESTRICTA 1: DESCARTA Y ELIMINA CUALQUIER PROPIEDAD QUE NO ESTÉ EN MARACAIBO O EL ESTADO ZULIA (VENEZUELA). Si el texto menciona otros países (ej. Chile, México) o ciudades fuera del Zulia, ignóralo por completo.
+REGLA ESTRICTA 2: EL USUARIO ESTÁ BUSCANDO EXCLUSIVAMENTE PROPIEDADES EN **${operacion ? operacion.toUpperCase() : 'VENTA O ALQUILER'}**. Si la publicación evidentemente es de la operación contraria (por ejemplo, buscas Alquiler y dice "Se Vende"), DESCÁRTALA POR COMPLETO Y NO LA INCLUYAS EN EL JSON.
 
 ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
 [
