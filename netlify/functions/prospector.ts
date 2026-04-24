@@ -38,7 +38,7 @@ export const handler = async (event: any) => {
                     q: searchQuery,
                     gl: 've', // Venezuela
                     hl: 'es', // Español
-                    tbs: 'qdr:w', // Última semana (garantiza frescura)
+                    tbs: 'qdr:d3', // Máximo 3 días de antigüedad
                     num: 10 // Get top 10 results
                 })
             });
@@ -77,7 +77,7 @@ Determina cuáles son publicaciones reales valiosas (preferiblemente trato direc
 
 REGLA ESTRICTA 1: DESCARTA Y ELIMINA CUALQUIER PROPIEDAD QUE NO ESTÉ EN MARACAIBO O EL ESTADO ZULIA (VENEZUELA). Si el texto menciona otros países (ej. Chile, México) o ciudades fuera del Zulia, ignóralo por completo.
 REGLA ESTRICTA 2: EL USUARIO ESTÁ BUSCANDO EXCLUSIVAMENTE PROPIEDADES EN **${operacion ? operacion.toUpperCase() : 'VENTA O ALQUILER'}**. Si la publicación evidentemente es de la operación contraria (por ejemplo, buscas Alquiler y dice "Se Vende"), DESCÁRTALA POR COMPLETO Y NO LA INCLUYAS EN EL JSON.
-REGLA ESTRICTA 3: SI EL TEXTO MENCIONA A "ANGEL PINTON", "RED90", "REMAX", "CENTURY21", "RENTAHOUSE", "KELLER WILLIAMS", "INMOBILIARIA", "AGENTE INMOBILIARIO", "CORREDOR", "HONORARIOS", "CLIENTES", O SIMILARES, EL CAMPO "isAgent" **TIENE QUE SER TRUE OBLIGATORIAMENTE**. NO LO MARQUES COMO DUEÑO DIRECTO.
+REGLA ESTRICTA 3: SI EL TEXTO MENCIONA A CUALQUIERA DE ESTAS AGENCIAS O PALABRAS: "ANGEL PINTON", "REMAX", "CENTURY 21", "CENTURY21", "RENT-A-HOUSE", "RENTAHOUSE", "CAUDALIA", "PINEDA", "INMUEBLES ZULIA", "KAREM BERNAL", "EL MILAGRO", "CASA PROPIA", "NEXT HOUSE", "H&J", "REGALADO", "RED90", "INMOBILIARIA", "AGENTE", "CORREDOR", "HONORARIOS", "CLIENTES", EL CAMPO "isAgent" **TIENE QUE SER TRUE OBLIGATORIAMENTE**. Aún así, INCLUYE ESTOS RESULTADOS en el JSON (no los descartes), pero asegúrate de marcarlos correctamente como agencia (isAgent: true).
 
 ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
 [
