@@ -26,7 +26,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
         description: '',
         link: '',
         status: 'todo',
-        assignee_id: '',
+        assignee_ids: [],
         due_date: ''
     });
     const [isSaving, setIsSaving] = useState(false);
@@ -109,7 +109,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
             alert("Error al mover la tarea.");
         } else {
             // Notificar estado nuevo vía WhatsApp
-            if (task.assignee_id) {
+            if (task.assignee_ids && task.assignee_ids.length > 0) {
                 const session = await supabase.auth.getSession();
                 const accessToken = session.data.session?.access_token;
                 if (accessToken) {
@@ -135,7 +135,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 description: task.description || '',
                 link: task.link || '',
                 status: task.status,
-                assignee_id: task.assignee_id || '',
+                assignee_ids: task.assignee_ids || [],
                 due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : ''
             });
         } else {
@@ -145,7 +145,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 description: '',
                 link: '',
                 status: 'todo',
-                assignee_id: '',
+                assignee_ids: [],
                 due_date: ''
             });
         }
@@ -167,7 +167,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
             
             if (formData.description) payload.description = formData.description;
             if (formData.link) payload.link = formData.link;
-            if (formData.assignee_id) payload.assignee_id = formData.assignee_id;
+            payload.assignee_ids = formData.assignee_ids || [];
             if (formData.due_date) payload.due_date = new Date(formData.due_date).toISOString();
 
             if (editingTask) {
@@ -186,8 +186,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                     setIsModalOpen(false);
 
                     // 🔔 Disparar notificación (Google Calendar + WhatsApp) de forma asíncrona
-                    // No bloqueamos la UI si falla
-                    if (data.id && data.assignee_id) {
+                    if (data.id && data.assignee_ids && data.assignee_ids.length > 0) {
                         const session = await supabase.auth.getSession();
                         const accessToken = session.data.session?.access_token;
                         if (accessToken) {
@@ -197,7 +196,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                     'Content-Type': 'application/json',
                                     'Authorization': `Bearer ${accessToken}`,
                                 },
-                                body: JSON.stringify({ taskId: data.id, assigneeId: data.assignee_id }),
+                                body: JSON.stringify({ taskId: data.id, assigneeIds: data.assignee_ids }),
                             }).then(async res => {
                                 const payload = await res.json();
                                 console.log('[Notify]', payload);
@@ -386,21 +385,29 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                                         </button>
                                                     )}
 
-                                                    {assignee ? (
-                                                        <div className="relative group/avatar" title={assignee.name}>
-                                                            {assignee.avatar ? (
-                                                                <img src={assignee.avatar} className="w-7 h-7 rounded-full border border-slate-200 bg-slate-100 object-cover" />
-                                                            ) : (
-                                                                <div className="w-7 h-7 rounded-full bg-brand-green text-white flex items-center justify-center text-xs font-bold border border-white">
-                                                                    {assignee.name.charAt(0)}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-7 h-7 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400" title="Sin asignar">
-                                                            <User className="w-3 h-3" />
-                                                        </div>
-                                                    )}
+                                                    <div className="flex -space-x-2">
+                                                        {task.assignee_ids && task.assignee_ids.length > 0 ? (
+                                                            task.assignee_ids.map(id => {
+                                                                const assignee = getAgent(id);
+                                                                if (!assignee) return null;
+                                                                return (
+                                                                    <div key={id} className="relative group/avatar" title={assignee.name}>
+                                                                        {assignee.avatar ? (
+                                                                            <img src={assignee.avatar} className="w-7 h-7 rounded-full border border-slate-200 bg-slate-100 object-cover" />
+                                                                        ) : (
+                                                                            <div className="w-7 h-7 rounded-full bg-brand-green text-white flex items-center justify-center text-xs font-bold border border-white">
+                                                                                {assignee.name.charAt(0)}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            <div className="w-7 h-7 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400" title="Sin asignar">
+                                                                <User className="w-3 h-3" />
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -433,7 +440,6 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredTasks.map(task => {
-                                const assignee = getAgent(task.assignee_id);
                                 const statusCol = columns.find(c => c.id === task.status);
                                 return (
                                     <tr 
@@ -451,18 +457,32 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {assignee ? (
-                                                <div className="flex items-center gap-2">
-                                                    {assignee.avatar ? (
-                                                        <img src={assignee.avatar} className="w-6 h-6 rounded-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold">{assignee.name.charAt(0)}</div>
-                                                    )}
-                                                    <span className="text-sm font-medium text-slate-700">{assignee.name}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-sm text-slate-400 italic">Sin asignar</span>
-                                            )}
+                                            <div className="flex -space-x-2 items-center">
+                                                {task.assignee_ids && task.assignee_ids.length > 0 ? (
+                                                    task.assignee_ids.map(id => {
+                                                        const assignee = getAgent(id);
+                                                        if (!assignee) return null;
+                                                        return (
+                                                            <div key={id} className="relative group" title={assignee.name}>
+                                                                {assignee.avatar ? (
+                                                                    <img src={assignee.avatar} className="w-6 h-6 rounded-full object-cover border-2 border-white relative z-10 hover:z-20 transition-transform hover:scale-110" />
+                                                                ) : (
+                                                                    <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold border-2 border-white relative z-10 hover:z-20 transition-transform hover:scale-110">
+                                                                        {assignee.name.charAt(0)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <span className="text-sm text-slate-400 italic">Sin asignar</span>
+                                                )}
+                                                {task.assignee_ids && task.assignee_ids.length > 0 && (
+                                                    <span className="text-xs text-slate-500 font-medium ml-4">
+                                                        {task.assignee_ids.length} asignado{task.assignee_ids.length > 1 ? 's' : ''}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-between">
@@ -520,18 +540,41 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1.5">Asignar a</label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <select
-                                            value={formData.assignee_id}
-                                            onChange={e => setFormData({...formData, assignee_id: e.target.value})}
-                                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all appearance-none"
-                                        >
-                                            <option value="">Sin asignar</option>
-                                            {agents.map(a => (
-                                                <option key={a.id} value={a.id}>{a.name} ({a.role})</option>
-                                            ))}
-                                        </select>
+                                    <div className="relative border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col">
+                                        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asesores ({formData.assignee_ids?.length || 0})</span>
+                                        </div>
+                                        <div className="max-h-40 overflow-y-auto p-2 space-y-1">
+                                            {agents.map(a => {
+                                                const isSelected = formData.assignee_ids?.includes(a.id);
+                                                return (
+                                                    <label key={a.id} className="flex items-center gap-3 p-2 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="w-4 h-4 rounded border-slate-300 text-brand-green focus:ring-brand-green"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    assignee_ids: checked 
+                                                                        ? [...(prev.assignee_ids || []), a.id]
+                                                                        : (prev.assignee_ids || []).filter(id => id !== a.id)
+                                                                }));
+                                                            }}
+                                                        />
+                                                        <div className="flex items-center gap-2">
+                                                            {a.avatar ? (
+                                                                <img src={a.avatar} className="w-5 h-5 rounded-full" />
+                                                            ) : (
+                                                                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">{a.name.charAt(0)}</div>
+                                                            )}
+                                                            <span className="text-sm font-medium text-slate-700">{a.name} <span className="text-slate-400 font-normal">({a.role})</span></span>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                                 

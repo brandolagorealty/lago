@@ -7,21 +7,15 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-/**
- * Limpia un número de teléfono y lo convierte al formato internacional de Venezuela (+58).
- */
 function formatVenezuelaPhone(phone) {
   if (!phone) return null;
-  const digits = phone.replace(/\D/g, '');
+  const digits = phone.replace(/\\D/g, '');
   if (digits.startsWith('58') && digits.length === 12) return digits;
   if (digits.startsWith('04') && digits.length === 11) return '58' + digits.substring(1);
   if (digits.startsWith('4') && digits.length === 10) return '58' + digits;
   return null;
 }
 
-/**
- * Envía un recordatorio de tarea pendiente vía WhatsApp.
- */
 async function sendTaskReminder(phone, agentName, taskTitle, dueDate, taskLink) {
   const phoneId = process.env.META_PHONE_ID;
   const token = process.env.META_WHATSAPP_TOKEN;
@@ -94,62 +88,73 @@ exports.handler = async () => {
 
   const taskLink = `${process.env.URL || 'https://lago-hub.netlify.app'}/admin#tasks`;
 
-  // 1. Obtener todas las tareas que NO estén finalizadas y tengan un asignado
+  // 1. Obtener todas las tareas que NO estén finalizadas
   const { data: tasks, error: tasksError } = await supabase
     .from('tasks')
-    .select('id, title, description, due_date, assignee_id, status')
-    .not('status', 'eq', 'done')
-    .not('assignee_id', 'is', null);
+    .select('id, title, description, due_date, assignee_ids, status')
+    .not('status', 'eq', 'done');
 
   if (tasksError) {
     console.error('[daily-reminders] Error fetching tasks:', tasksError.message);
     return { statusCode: 500, body: 'Error fetching tasks' };
   }
 
-  if (!tasks || tasks.length === 0) {
-    console.log('[daily-reminders] No pending tasks found. All clear! ✅');
+  // Filtrar tareas que tengan al menos un asignado
+  const assignedTasks = tasks.filter(t => t.assignee_ids && t.assignee_ids.length > 0);
+
+  if (!assignedTasks || assignedTasks.length === 0) {
+    console.log('[daily-reminders] No pending assigned tasks found. All clear! ✅');
     return { statusCode: 200, body: 'No pending tasks' };
   }
 
-  console.log(`[daily-reminders] Found ${tasks.length} pending task(s). Processing...`);
+  console.log(`[daily-reminders] Found ${assignedTasks.length} pending task(s). Processing...`);
 
-  // 2. Obtener IDs únicos de asesores asignados para hacer solo una consulta a la BD
-  const uniqueAssigneeIds = [...new Set(tasks.map((t) => t.assignee_id))];
+  // 2. Obtener IDs únicos de asesores
+  const uniqueAssigneeIds = new Set();
+  assignedTasks.forEach(task => {
+    task.assignee_ids.forEach(id => uniqueAssigneeIds.add(id));
+  });
 
   const { data: agents, error: agentsError } = await supabase
     .from('agents')
     .select('id, name, phone')
-    .in('id', uniqueAssigneeIds);
+    .in('id', Array.from(uniqueAssigneeIds));
 
   if (agentsError) {
     console.error('[daily-reminders] Error fetching agents:', agentsError.message);
     return { statusCode: 500, body: 'Error fetching agents' };
   }
 
-  // Crear mapa de asesores por ID para acceso rápido
   const agentMap = {};
   agents.forEach((a) => { agentMap[a.id] = a; });
 
-  // 3. Enviar recordatorio por cada tarea en paralelo
-  const reminderPromises = tasks.map((task) => {
-    const agent = agentMap[task.assignee_id];
-    if (!agent) return Promise.resolve({ success: false, reason: 'Agent not found' });
-    return sendTaskReminder(
-      agent.phone,
-      agent.name,
-      task.title,
-      task.due_date,
-      taskLink
-    );
+  // 3. Enviar recordatorio por cada tarea a cada uno de sus asignados
+  const reminderPromises = [];
+  
+  assignedTasks.forEach(task => {
+    task.assignee_ids.forEach(agentId => {
+      const agent = agentMap[agentId];
+      if (agent) {
+        reminderPromises.push(
+          sendTaskReminder(
+            agent.phone,
+            agent.name,
+            task.title,
+            task.due_date,
+            taskLink
+          )
+        );
+      }
+    });
   });
 
   const results = await Promise.all(reminderPromises);
   const successCount = results.filter((r) => r.success).length;
 
-  console.log(`[daily-reminders] ✅ Finished. ${successCount}/${tasks.length} reminders sent successfully.`);
+  console.log(`[daily-reminders] ✅ Finished. ${successCount}/${reminderPromises.length} reminders sent successfully.`);
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ sent: successCount, total: tasks.length }),
+    body: JSON.stringify({ sent: successCount, total: reminderPromises.length }),
   };
 };

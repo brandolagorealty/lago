@@ -105,7 +105,7 @@ export interface LagoTask {
   link?: string;
   status: TaskStatus;
   due_date?: string;
-  assignee_id?: string;
+  assignee_ids?: string[];
   assignor_id?: string;
   created_at: string;
   updated_at: string;
