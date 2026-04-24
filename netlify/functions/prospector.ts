@@ -24,6 +24,7 @@ export const handler = async (event: any) => {
 
         // 1. Serper.dev Google Search API
         let searchContext = "";
+        let globalCrawledData: any[] = [];
         try {
             const SERPER_API_KEY = process.env.SERPER_API_KEY || 'd4829eebc87e8548cacf6ba8029329d5df695ffc';
             const searchQuery = query + ' Zulia Venezuela';
@@ -120,7 +121,7 @@ export const handler = async (event: any) => {
                 });
                 
                 // Exponer crawledData para usar las imágenes luego
-                (data as any).crawledData = crawledData;
+                globalCrawledData = crawledData;
             }
 
             if (results.length === 0) {
@@ -166,8 +167,8 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 6 MEJORES, INCLUYE AGENCIA
         const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
         
         const geminiParts: any[] = [{ text: systemInstructions + '\n\n' + prompt }];
-        if ((data as any).crawledData) {
-            (data as any).crawledData.forEach((item: any, idx: number) => {
+        if (globalCrawledData.length > 0) {
+            globalCrawledData.forEach((item: any, idx: number) => {
                 if (item && item.base64Image) {
                     geminiParts.push({ text: `\n[FOTO DE LA PUBLICACIÓN ${idx + 1}]:` });
                     geminiParts.push({
