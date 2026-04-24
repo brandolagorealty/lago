@@ -32,7 +32,14 @@ const AppraiserModule: React.FC = () => {
         estacionamiento: '',
         edad: '',
         estadoFisico: '',
+        niveles: '1',
         equipamiento: [] as string[],
+        areasServicio: {
+            lavanderia: false,
+            tendedero: false,
+            cuartoServicio: false,
+            maletero: false
+        },
         sistemaAgua: {
             tienePozo: false,
             tieneTanque: false,
@@ -71,6 +78,16 @@ const AppraiserModule: React.FC = () => {
             extras: {
                 ...formData.extras,
                 [e.target.name as keyof typeof formData.extras]: e.target.checked
+            }
+        });
+    };
+
+    const handleAreaServicioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({
+            ...formData,
+            areasServicio: {
+                ...formData.areasServicio,
+                [e.target.name as keyof typeof formData.areasServicio]: e.target.checked
             }
         });
     };
@@ -140,12 +157,27 @@ const AppraiserModule: React.FC = () => {
             }
             const aguaFinal = aguaDesc.length > 0 ? aguaDesc.join(' y ') : 'Servicio estándar';
 
+            const selectedAreas = Object.entries(formData.areasServicio)
+                .filter(([_, isChecked]) => isChecked)
+                .map(([key]) => {
+                    switch(key) {
+                        case 'lavanderia': return 'Lavandería';
+                        case 'tendedero': return 'Tendedero';
+                        case 'cuartoServicio': return 'Cuarto de Servicio';
+                        case 'maletero': return 'Maletero';
+                        default: return key;
+                    }
+                });
+            const areasFinal = selectedAreas.length > 0 ? `Áreas de Servicio: ${selectedAreas.join(', ')}.` : '';
+
+            const nivelesStr = (formData.tipoInmueble === 'Casa' || formData.tipoInmueble === 'Townhouse') ? `, Niveles: ${formData.niveles}` : '';
+
             const payload = {
                 ubicacion: ubicacionFinal,
                 superficie: formData.superficie,
-                distribucion: `Tipo: ${formData.tipoInmueble}, Distribución: ${formData.distribucion}, Estacionamiento: ${formData.estacionamiento} puestos`,
+                distribucion: `Tipo: ${formData.tipoInmueble}${nivelesStr}, Distribución: ${formData.distribucion}, Estacionamiento: ${formData.estacionamiento} puestos`,
                 estado: `${formData.edad} años de antigüedad, estado: ${formData.estadoFisico}`,
-                extras: `Extras: ${extrasFinal}. Suministro de Agua: ${aguaFinal}. Equipamiento: ${equipamientoFinal}`
+                extras: `Extras: ${extrasFinal}. Suministro de Agua: ${aguaFinal}. ${areasFinal} Equipamiento: ${equipamientoFinal}`
             };
 
             const response = await fetch('/.netlify/functions/appraiser', {
@@ -180,8 +212,8 @@ const AppraiserModule: React.FC = () => {
                     </div>
                     Tasador AI
                 </h2>
-                <p className="text-slate-500 mt-2 ml-15 text-lg">
-                    Generador de avalúos impulsado por Gemini adaptado al mercado inmobiliario de Maracaibo.
+                <p className="text-slate-600 mt-2 ml-15 text-xl font-medium leading-relaxed">
+                    Sistema avanzado de valoración y tasación adaptado exclusivamente al mercado inmobiliario del Zulia.
                 </p>
             </div>
 
@@ -245,6 +277,22 @@ const AppraiserModule: React.FC = () => {
                                     className="w-full mt-3 bg-white border border-orange-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
                                 />
                             )}
+                            <div className="grid grid-cols-2 gap-3 mt-3">
+                                <input
+                                    name="avenida"
+                                    value={formData.avenida}
+                                    onChange={handleChange}
+                                    placeholder="Avenida (Opcional)"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium text-sm"
+                                />
+                                <input
+                                    name="calle"
+                                    value={formData.calle}
+                                    onChange={handleChange}
+                                    placeholder="Calle (Opcional)"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium text-sm"
+                                />
+                            </div>
                         </div>
 
                         <div>
@@ -262,8 +310,8 @@ const AppraiserModule: React.FC = () => {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                            <div className="md:col-span-6">
                                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                                     <BedDouble className="w-4 h-4 text-slate-400" />
                                     Distribución
@@ -277,7 +325,29 @@ const AppraiserModule: React.FC = () => {
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
                                 />
                             </div>
-                            <div>
+                            
+                            {(formData.tipoInmueble === 'Casa' || formData.tipoInmueble === 'Townhouse') && (
+                                <div className="md:col-span-3">
+                                    <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <Building className="w-4 h-4 text-slate-400" />
+                                        Niveles
+                                    </label>
+                                    <select
+                                        required
+                                        name="niveles"
+                                        value={formData.niveles}
+                                        onChange={handleChange}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                                    >
+                                        <option value="1">1 Nivel</option>
+                                        <option value="2">2 Niveles</option>
+                                        <option value="3">3 Niveles</option>
+                                        <option value="4+">4+ Niveles</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            <div className={(formData.tipoInmueble === 'Casa' || formData.tipoInmueble === 'Townhouse') ? 'md:col-span-3' : 'md:col-span-6'}>
                                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                                     <Car className="w-4 h-4 text-slate-400" />
                                     Puestos
@@ -376,6 +446,32 @@ const AppraiserModule: React.FC = () => {
                                     ))}
                                 </div>
                             )}
+                        </div>
+
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                            <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                <Plus className="w-4 h-4 text-slate-400" />
+                                Áreas de Servicio
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { id: 'lavanderia', label: 'Lavandería / Cuarto de Lavado' },
+                                    { id: 'tendedero', label: 'Tendedero al aire libre' },
+                                    { id: 'cuartoServicio', label: 'Cuarto de Servicio' },
+                                    { id: 'maletero', label: 'Maletero / Depósito' }
+                                ].map((item) => (
+                                    <label key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
+                                        <input
+                                            type="checkbox"
+                                            name={item.id}
+                                            checked={formData.areasServicio[item.id as keyof typeof formData.areasServicio]}
+                                            onChange={handleAreaServicioChange}
+                                            className="w-5 h-5 rounded text-orange-500 focus:ring-orange-500/20 border-slate-300"
+                                        />
+                                        <span className="text-sm font-medium text-slate-700">{item.label}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
 
                         <div>
