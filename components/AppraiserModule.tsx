@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { marked } from 'marked';
-import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy } from 'lucide-react';
+import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy, Home, Sofa, X, Car } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../services/supabase';
 import { MARACAIBO_SECTORS } from '../constants/locations';
@@ -22,18 +22,35 @@ const AppraiserModule: React.FC = () => {
     const [copied, setCopied] = useState(false);
 
     const [formData, setFormData] = useState({
+        tipoInmueble: '',
         ubicacion: '',
+        customUbicacion: '',
         superficie: '',
         distribucion: '',
+        estacionamiento: '',
         edad: '',
         estadoFisico: '',
+        equipamiento: [] as string[],
         extras: {
             piscina: false,
             pozo: false,
             planta: false,
-            marmol: false
+            marmol: false,
+            vigilancia: false,
+            calle_cerrada: false,
+            internet: false
         }
     });
+
+    const toggleEquipamiento = (item: string) => {
+        if (!item) return;
+        setFormData(prev => ({
+            ...prev,
+            equipamiento: prev.equipamiento.includes(item) 
+                ? prev.equipamiento.filter(i => i !== item)
+                : [...prev.equipamiento, item]
+        }));
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -79,16 +96,23 @@ const AppraiserModule: React.FC = () => {
                         case 'pozo': return 'Pozo de agua';
                         case 'planta': return 'Planta eléctrica';
                         case 'marmol': return 'Piso de mármol';
+                        case 'vigilancia': return 'Vigilancia 24/7';
+                        case 'calle_cerrada': return 'Calle Cerrada / Villa';
+                        case 'internet': return 'Internet Fibra Óptica';
                         default: return key;
                     }
-                }).join(', ');
+                });
+
+            const ubicacionFinal = formData.ubicacion === 'Otro' ? formData.customUbicacion : formData.ubicacion;
+            const equipamientoFinal = formData.equipamiento.length > 0 ? formData.equipamiento.join(', ') : 'Vacío / Sin equipamiento';
+            const extrasFinal = selectedExtras.length > 0 ? selectedExtras.join(', ') : 'Ninguno';
 
             const payload = {
-                ubicacion: formData.ubicacion,
+                ubicacion: ubicacionFinal,
                 superficie: formData.superficie,
-                distribucion: formData.distribucion,
+                distribucion: `Tipo: ${formData.tipoInmueble}, Distribución: ${formData.distribucion}, Estacionamiento: ${formData.estacionamiento} puestos`,
                 estado: `${formData.edad} años de antigüedad, estado: ${formData.estadoFisico}`,
-                extras: selectedExtras || 'Ninguno'
+                extras: `Extras: ${extrasFinal}. Equipamiento: ${equipamientoFinal}`
             };
 
             const response = await fetch('/.netlify/functions/appraiser', {
@@ -153,7 +177,18 @@ const AppraiserModule: React.FC = () => {
                                 {MARACAIBO_SECTORS.map(sector => (
                                     <option key={sector} value={sector}>{sector}</option>
                                 ))}
+                                <option value="Otro">Otro sector...</option>
                             </select>
+                            {formData.ubicacion === 'Otro' && (
+                                <input
+                                    required
+                                    name="customUbicacion"
+                                    value={formData.customUbicacion}
+                                    onChange={handleChange}
+                                    placeholder="Ej: Sector La Picola..."
+                                    className="w-full mt-3 bg-white border border-orange-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                                />
+                            )}
                         </div>
 
                         <div>
@@ -171,19 +206,42 @@ const AppraiserModule: React.FC = () => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                                <BedDouble className="w-4 h-4 text-slate-400" />
-                                Distribución
-                            </label>
-                            <input
-                                required
-                                name="distribucion"
-                                value={formData.distribucion}
-                                onChange={handleChange}
-                                placeholder="Ej: 3 habitaciones, 3 baños, 2 puestos"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <BedDouble className="w-4 h-4 text-slate-400" />
+                                    Distribución
+                                </label>
+                                <input
+                                    required
+                                    name="distribucion"
+                                    value={formData.distribucion}
+                                    onChange={handleChange}
+                                    placeholder="Ej: 3 hab, 3 baños"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <Car className="w-4 h-4 text-slate-400" />
+                                    Puestos
+                                </label>
+                                <select
+                                    required
+                                    name="estacionamiento"
+                                    value={formData.estacionamiento}
+                                    onChange={handleChange}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                                >
+                                    <option value="" disabled>-</option>
+                                    <option value="0">0</option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5+">5+</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -229,6 +287,41 @@ const AppraiserModule: React.FC = () => {
                             </div>
                         </div>
 
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <Sofa className="w-4 h-4 text-slate-400" />
+                                Muebles y Electrodomésticos
+                            </label>
+                            
+                            <select
+                                value=""
+                                onChange={(e) => toggleEquipamiento(e.target.value)}
+                                className="w-full mb-3 bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                            >
+                                <option value="" disabled>Añadir elemento a la lista...</option>
+                                {[
+                                    'Aire Acondicionado Central', 'Aires Split', 'Cocina Equipada',
+                                    'Nevera', 'Lavadora / Secadora', 'Amoblado Total', 'Semi-Amoblado',
+                                    'Comedor', 'Juego de Recibo', 'Camas'
+                                ].map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                ))}
+                            </select>
+
+                            {formData.equipamiento.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {formData.equipamiento.map(item => (
+                                        <span key={item} className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm">
+                                            {item}
+                                            <button type="button" onClick={() => toggleEquipamiento(item)} className="hover:text-red-500 transition-colors">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
                                 <Plus className="w-4 h-4 text-slate-400" />
@@ -239,7 +332,10 @@ const AppraiserModule: React.FC = () => {
                                     { id: 'piscina', label: 'Piscina' },
                                     { id: 'pozo', label: 'Pozo de Agua' },
                                     { id: 'planta', label: 'Planta Eléctrica' },
-                                    { id: 'marmol', label: 'Piso de Mármol' }
+                                    { id: 'marmol', label: 'Piso de Mármol' },
+                                    { id: 'vigilancia', label: 'Vigilancia 24/7' },
+                                    { id: 'calle_cerrada', label: 'Calle Cerrada / Villa' },
+                                    { id: 'internet', label: 'Internet Fibra' }
                                 ].map((item) => (
                                     <label key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                                         <input
