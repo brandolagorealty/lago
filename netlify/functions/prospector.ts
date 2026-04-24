@@ -70,6 +70,15 @@ export const handler = async (event: any) => {
                         const html = await response.text();
                         const $ = cheerio.load(html);
                         
+                        // Extraer primera imagen válida
+                        let firstImageUrl = '';
+                        $('img').each((i, el) => {
+                            const src = $(el).attr('src');
+                            if (src && src.startsWith('http') && !firstImageUrl) {
+                                firstImageUrl = src;
+                            }
+                        });
+
                         // Limpiar elementos no textuales
                         $('script, style, noscript, iframe, img, svg, header, footer, nav, button').remove();
                         const fullText = $('body').text().replace(/\s+/g, ' ').trim();
@@ -77,20 +86,41 @@ export const handler = async (event: any) => {
                         // Si nos bloquean (ej: FB/IG) el texto es muy corto. Fallback al snippet.
                         const validText = fullText.length > 150 ? fullText.substring(0, 3000) : item.snippet;
                         
-                        return { title: item.title, link: item.link, text: validText };
+                        let base64Image = null;
+                        let mimeType = '';
+                        if (firstImageUrl) {
+                            try {
+                                const imgController = new AbortController();
+                                const imgTimeoutId = setTimeout(() => imgController.abort(), 1500); // 1.5s max
+                                const imgResponse = await fetch(firstImageUrl, { signal: imgController.signal });
+                                clearTimeout(imgTimeoutId);
+                                if (imgResponse.ok) {
+                                    const arrayBuffer = await imgResponse.arrayBuffer();
+                                    base64Image = Buffer.from(arrayBuffer).toString('base64');
+                                    mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+                                }
+                            } catch (e) {
+                                // Ignorar error de imagen
+                            }
+                        }
+
+                        return { title: item.title, link: item.link, text: validText, base64Image, mimeType };
                     } catch (e) {
                         // Fallback natural al snippet de Serper si la web bloquea el bot o tarda mucho
-                        return { title: item.title, link: item.link, text: item.snippet };
+                        return { title: item.title, link: item.link, text: item.snippet, base64Image: null, mimeType: '' };
                     }
                 });
                 
                 const crawledData = await Promise.all(crawlPromises);
                 
-                crawledData.forEach(item => {
+                crawledData.forEach((item, idx) => {
                     if (item) {
-                        results.push(`TÍTULO: ${item.title}\nURL: ${item.link || ''}\nTEXTO EXTRAÍDO: ${item.text}`);
+                        results.push(`--- PUBLICACIÓN ${idx + 1} ---\nTÍTULO: ${item.title}\nURL: ${item.link || ''}\nTEXTO EXTRAÍDO: ${item.text}`);
                     }
                 });
+                
+                // Exponer crawledData para usar las imágenes luego
+                (data as any).crawledData = crawledData;
             }
 
             if (results.length === 0) {
@@ -117,6 +147,7 @@ Determina cuáles son publicaciones reales valiosas (preferiblemente trato direc
 REGLA ESTRICTA 1: DESCARTA Y ELIMINA CUALQUIER PROPIEDAD QUE NO ESTÉ EN MARACAIBO O EL ESTADO ZULIA (VENEZUELA). Si el texto menciona otros países (ej. Chile, México) o ciudades fuera del Zulia, ignóralo por completo.
 REGLA ESTRICTA 2: EL USUARIO ESTÁ BUSCANDO EXCLUSIVAMENTE PROPIEDADES EN **${operacion ? operacion.toUpperCase() : 'VENTA O ALQUILER'}**. Si la publicación evidentemente es de la operación contraria (por ejemplo, buscas Alquiler y dice "Se Vende"), DESCÁRTALA POR COMPLETO Y NO LA INCLUYAS EN EL JSON.
 REGLA ESTRICTA 3: SI EL TEXTO MENCIONA A CUALQUIERA DE ESTAS AGENCIAS O PALABRAS: "ANGEL PINTON", "REMAX", "CENTURY 21", "CENTURY21", "RENT-A-HOUSE", "RENTAHOUSE", "CAUDALIA", "PINEDA", "INMUEBLES ZULIA", "KAREM BERNAL", "EL MILAGRO", "CASA PROPIA", "NEXT HOUSE", "H&J", "REGALADO", "RED90", "INMOBILIARIA", "AGENTE", "CORREDOR", "HONORARIOS", "CLIENTES", EL CAMPO "isAgent" **TIENE QUE SER TRUE OBLIGATORIAMENTE**. Aún así, INCLUYE ESTOS RESULTADOS en el JSON (no los descartes), pero asegúrate de marcarlos correctamente como agencia (isAgent: true).
+REGLA ESTRICTA 4 (VISIÓN ARTIFICIAL): Analiza las IMÁGENES adjuntas (si las hay). Si ves marcas de agua, logos o textos superpuestos en las fotos que pertenezcan a Remax, Century 21, Angel Pinton, Rent-A-House o cualquier inmobiliaria, el campo "isAgent" TIENE QUE SER TRUE OBLIGATORIAMENTE, incluso si el texto dice "Dueño Directo".
 
 ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
 [
@@ -129,10 +160,25 @@ ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
     "reasoning": "Breve razón de por qué es dueño o agencia."
   }
 ]
-NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BASURA O ENLACES CAÍDOS).
+NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 6 MEJORES, INCLUYE AGENCIAS Y DUEÑOS, DESCARTA LA BASURA).
 `;
 
         const prompt = `TEXTOS EXTRAÍDOS DE LA WEB PARA LA BÚSQUEDA "${query}":\n\n${searchContext}`;
+        
+        const geminiParts: any[] = [{ text: systemInstructions + '\n\n' + prompt }];
+        if ((data as any).crawledData) {
+            (data as any).crawledData.forEach((item: any, idx: number) => {
+                if (item && item.base64Image) {
+                    geminiParts.push({ text: `\n[FOTO DE LA PUBLICACIÓN ${idx + 1}]:` });
+                    geminiParts.push({
+                        inlineData: {
+                            data: item.base64Image,
+                            mimeType: item.mimeType
+                        }
+                    });
+                }
+            });
+        }
 
         // Fallback chain: newest → oldest
         const modelsToTry = [
@@ -158,7 +204,7 @@ NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BAS
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [
-                            { role: 'user', parts: [{ text: systemInstructions + '\n\n' + prompt }] }
+                            { role: 'user', parts: geminiParts }
                         ],
                         generationConfig: {
                             temperature: 0.4,
