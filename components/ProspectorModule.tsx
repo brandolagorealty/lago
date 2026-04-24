@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Globe, AlertTriangle, User, Building, MapPin, Tag, Filter } from 'lucide-react';
+import { Search, Globe, AlertTriangle, User, Building, MapPin, Tag, Filter, ExternalLink } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { MARACAIBO_SECTORS } from '../constants/locations';
 
