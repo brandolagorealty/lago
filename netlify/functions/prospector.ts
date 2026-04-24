@@ -25,7 +25,7 @@ export const handler = async (event: any) => {
         // 1. Scraping Manual DuckDuckGo
         let searchContext = "";
         try {
-            const searchQuery = encodeURIComponent(query + ' (inmobilia OR conlallave OR encuentra24 OR mercadolibre Zulia)');
+            const searchQuery = encodeURIComponent(query + ' Zulia Venezuela');
             const url = `https://html.duckduckgo.com/html/?q=${searchQuery}&df=m`;
             const res = await fetch(url, { 
                 headers: { 

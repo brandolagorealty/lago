@@ -42,10 +42,10 @@ export default function ProspectorModule() {
         setError(null);
         setResults([]);
 
-        let queryParts = [`"${formData.operacion} de ${formData.tipoInmueble}"`];
-        if (formData.ubicacion) queryParts.push(`"${formData.ubicacion}"`);
-        queryParts.push("Maracaibo Zulia");
-        if (formData.soloDuenos) queryParts.push(`(trato directo OR dueño vende OR sin intermediarios)`);
+        let queryParts = [`${formData.operacion} ${formData.tipoInmueble}`];
+        if (formData.ubicacion) queryParts.push(formData.ubicacion);
+        queryParts.push("Maracaibo");
+        if (formData.soloDuenos) queryParts.push(`"dueño" OR "directo"`);
         if (formData.keywords) queryParts.push(formData.keywords);
         
         const finalQuery = queryParts.join(' ');
