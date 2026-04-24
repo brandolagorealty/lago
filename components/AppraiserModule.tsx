@@ -25,20 +25,29 @@ const AppraiserModule: React.FC = () => {
         tipoInmueble: '',
         ubicacion: '',
         customUbicacion: '',
+        avenida: '',
+        calle: '',
         superficie: '',
         distribucion: '',
         estacionamiento: '',
         edad: '',
         estadoFisico: '',
         equipamiento: [] as string[],
+        sistemaAgua: {
+            tienePozo: false,
+            tieneTanque: false,
+            tipoTanque: '',
+            capacidadTanque: '',
+            hidroneumatico: false
+        },
         extras: {
             piscina: false,
-            pozo: false,
             planta: false,
             marmol: false,
             vigilancia: false,
             calle_cerrada: false,
-            internet: false
+            internet: false,
+            patio: false
         }
     });
 
@@ -62,6 +71,17 @@ const AppraiserModule: React.FC = () => {
             extras: {
                 ...formData.extras,
                 [e.target.name as keyof typeof formData.extras]: e.target.checked
+            }
+        });
+    };
+
+    const handleAguaChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
+        setFormData({
+            ...formData,
+            sistemaAgua: {
+                ...formData.sistemaAgua,
+                [e.target.name]: value
             }
         });
     };
@@ -93,26 +113,39 @@ const AppraiserModule: React.FC = () => {
                 .map(([key]) => {
                     switch(key) {
                         case 'piscina': return 'Piscina';
-                        case 'pozo': return 'Pozo de agua';
                         case 'planta': return 'Planta eléctrica';
                         case 'marmol': return 'Piso de mármol';
                         case 'vigilancia': return 'Vigilancia 24/7';
                         case 'calle_cerrada': return 'Calle Cerrada / Villa';
                         case 'internet': return 'Internet Fibra Óptica';
+                        case 'patio': return 'Patio Trasero';
                         default: return key;
                     }
                 });
 
-            const ubicacionFinal = formData.ubicacion === 'Otro' ? formData.customUbicacion : formData.ubicacion;
+            let ubicacionFinal = formData.ubicacion === 'Otro' ? formData.customUbicacion : formData.ubicacion;
+            if (formData.avenida) ubicacionFinal += `, Avenida: ${formData.avenida}`;
+            if (formData.calle) ubicacionFinal += `, Calle: ${formData.calle}`;
+
             const equipamientoFinal = formData.equipamiento.length > 0 ? formData.equipamiento.join(', ') : 'Vacío / Sin equipamiento';
             const extrasFinal = selectedExtras.length > 0 ? selectedExtras.join(', ') : 'Ninguno';
+
+            let aguaDesc = [];
+            if (formData.sistemaAgua.tienePozo) aguaDesc.push('Pozo de agua');
+            if (formData.sistemaAgua.tieneTanque) {
+                let tDesc = `Tanque ${formData.sistemaAgua.tipoTanque || ''}`;
+                if (formData.sistemaAgua.capacidadTanque) tDesc += ` de ${formData.sistemaAgua.capacidadTanque} Lts`;
+                if (formData.sistemaAgua.hidroneumatico) tDesc += ' con hidroneumático';
+                aguaDesc.push(tDesc.trim());
+            }
+            const aguaFinal = aguaDesc.length > 0 ? aguaDesc.join(' y ') : 'Servicio estándar';
 
             const payload = {
                 ubicacion: ubicacionFinal,
                 superficie: formData.superficie,
                 distribucion: `Tipo: ${formData.tipoInmueble}, Distribución: ${formData.distribucion}, Estacionamiento: ${formData.estacionamiento} puestos`,
                 estado: `${formData.edad} años de antigüedad, estado: ${formData.estadoFisico}`,
-                extras: `Extras: ${extrasFinal}. Equipamiento: ${equipamientoFinal}`
+                extras: `Extras: ${extrasFinal}. Suministro de Agua: ${aguaFinal}. Equipamiento: ${equipamientoFinal}`
             };
 
             const response = await fetch('/.netlify/functions/appraiser', {
@@ -161,6 +194,29 @@ const AppraiserModule: React.FC = () => {
                     </div>
                     <form onSubmit={handleSubmit} className="p-6 space-y-5">
                         
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <Home className="w-4 h-4 text-slate-400" />
+                                Tipo de Inmueble
+                            </label>
+                            <select
+                                required
+                                name="tipoInmueble"
+                                value={formData.tipoInmueble}
+                                onChange={handleChange}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                            >
+                                <option value="" disabled>Seleccionar Tipo...</option>
+                                <option value="Apartamento">Apartamento</option>
+                                <option value="Casa">Casa</option>
+                                <option value="Townhouse">Townhouse</option>
+                                <option value="Local Comercial">Local Comercial</option>
+                                <option value="Galpón">Galpón</option>
+                                <option value="Oficina">Oficina</option>
+                                <option value="Terreno">Terreno</option>
+                            </select>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                                 <MapPin className="w-4 h-4 text-slate-400" />
@@ -330,12 +386,12 @@ const AppraiserModule: React.FC = () => {
                             <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
                                 {[
                                     { id: 'piscina', label: 'Piscina' },
-                                    { id: 'pozo', label: 'Pozo de Agua' },
                                     { id: 'planta', label: 'Planta Eléctrica' },
                                     { id: 'marmol', label: 'Piso de Mármol' },
                                     { id: 'vigilancia', label: 'Vigilancia 24/7' },
                                     { id: 'calle_cerrada', label: 'Calle Cerrada / Villa' },
-                                    { id: 'internet', label: 'Internet Fibra' }
+                                    { id: 'internet', label: 'Internet Fibra' },
+                                    ...(formData.tipoInmueble === 'Casa' || formData.tipoInmueble === 'Townhouse' ? [{ id: 'patio', label: 'Patio Trasero' }] : [])
                                 ].map((item) => (
                                     <label key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                                         <input
@@ -349,6 +405,38 @@ const AppraiserModule: React.FC = () => {
                                     </label>
                                 ))}
                             </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                            <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                <Building className="w-4 h-4 text-slate-400" />
+                                Suministro de Agua
+                            </label>
+                            <div className="flex gap-4 mb-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="tienePozo" checked={formData.sistemaAgua.tienePozo} onChange={handleAguaChange} className="w-5 h-5 rounded text-orange-500 border-slate-300" />
+                                    <span className="text-sm font-bold text-slate-700">Pozo de Agua</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="tieneTanque" checked={formData.sistemaAgua.tieneTanque} onChange={handleAguaChange} className="w-5 h-5 rounded text-orange-500 border-slate-300" />
+                                    <span className="text-sm font-bold text-slate-700">Tanque de Agua</span>
+                                </label>
+                            </div>
+                            
+                            {formData.sistemaAgua.tieneTanque && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-white border border-slate-200 rounded-xl animate-in slide-in-from-top-2">
+                                    <select name="tipoTanque" value={formData.sistemaAgua.tipoTanque} onChange={handleAguaChange} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none appearance-none">
+                                        <option value="" disabled>Tipo de Tanque...</option>
+                                        <option value="Subterráneo">Subterráneo</option>
+                                        <option value="Aéreo / Cilíndrico">Aéreo / Cilíndrico</option>
+                                    </select>
+                                    <input name="capacidadTanque" value={formData.sistemaAgua.capacidadTanque} onChange={handleAguaChange} placeholder="Capacidad (Ej: 8000)" type="number" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none" />
+                                    <label className="flex items-center gap-2 cursor-pointer md:col-span-2 mt-1">
+                                        <input type="checkbox" name="hidroneumatico" checked={formData.sistemaAgua.hidroneumatico} onChange={handleAguaChange} className="w-4 h-4 rounded text-orange-500 border-slate-300" />
+                                        <span className="text-sm font-medium text-slate-600">Con Sistema Hidroneumático</span>
+                                    </label>
+                                </div>
+                            )}
                         </div>
 
                         {error && (
