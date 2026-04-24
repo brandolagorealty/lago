@@ -22,30 +22,36 @@ export const handler = async (event: any) => {
             };
         }
 
-        // 1. Scraping Manual DuckDuckGo
+        // 1. Serper.dev Google Search API
         let searchContext = "";
         try {
-            const searchQuery = encodeURIComponent(query + ' Zulia Venezuela');
-            const url = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
-            const res = await fetch(url, { 
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36' 
-                } 
-            });
-            const html = await res.text();
+            const SERPER_API_KEY = process.env.SERPER_API_KEY || 'd4829eebc87e8548cacf6ba8029329d5df695ffc';
+            const searchQuery = query + ' Zulia Venezuela';
             
-            const $ = cheerio.load(html);
+            const res = await fetch("https://google.serper.dev/search", {
+                method: 'POST',
+                headers: {
+                    'X-API-KEY': SERPER_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    q: searchQuery,
+                    gl: 've', // Venezuela
+                    hl: 'es', // Español
+                    num: 10 // Get top 10 results
+                })
+            });
+            
+            const data = await res.json();
             const results: string[] = [];
             
-            $('.result').slice(0, 8).each((_, el) => {
-                const title = $(el).find('.result__title').text().trim();
-                const link = $(el).find('.result__url').attr('href') || '';
-                const snippet = $(el).find('.result__snippet').text().trim();
-                
-                if (title && snippet) {
-                    results.push(`TÍTULO: ${title}\nURL: ${link}\nDESCRIPCIÓN: ${snippet}`);
-                }
-            });
+            if (data.organic && Array.isArray(data.organic)) {
+                data.organic.slice(0, 8).forEach((item: any) => {
+                    if (item.title && item.snippet) {
+                        results.push(`TÍTULO: ${item.title}\nURL: ${item.link || ''}\nDESCRIPCIÓN: ${item.snippet}`);
+                    }
+                });
+            }
 
             if (results.length === 0) {
                 return {
