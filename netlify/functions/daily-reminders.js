@@ -1,9 +1,9 @@
 // netlify/functions/daily-reminders.js
-// Función programada (Cron Job) que se ejecuta todos los días a las 12:00 PM (hora Venezuela).
+// Función programada (Cron Job) que se ejecuta en horarios específicos:
+// 9:00 AM, 1:00 PM, 4:00 PM, 7:00 PM (hora Venezuela / UTC-4).
 // Revisa las tareas pendientes y envía un recordatorio por WhatsApp a cada asesor.
-
-// Schedule: 16:00 UTC = 12:00 PM Venezuela (UTC-4)
-// En netlify.toml se configura el schedule: "0 16 * * *"
+//
+// Schedule en netlify.toml: "0 13,17,20,23 * * *"
 
 const { createClient } = require('@supabase/supabase-js');
 
