@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../services/supabase';
+import { MARACAIBO_SECTORS } from '../constants/locations';
 
 interface AppraiserResult {
     markdownReport: string;
@@ -24,12 +25,28 @@ const AppraiserModule: React.FC = () => {
         ubicacion: '',
         superficie: '',
         distribucion: '',
-        estado: '',
-        extras: ''
+        edad: '',
+        estadoFisico: '',
+        extras: {
+            piscina: false,
+            pozo: false,
+            planta: false,
+            marmol: false
+        }
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({
+            ...formData,
+            extras: {
+                ...formData.extras,
+                [e.target.name as keyof typeof formData.extras]: e.target.checked
+            }
+        });
     };
 
     const handleCopy = () => {
@@ -54,13 +71,33 @@ const AppraiserModule: React.FC = () => {
             const { data } = await supabase.auth.getSession();
             const token = data.session?.access_token;
             
+            const selectedExtras = Object.entries(formData.extras)
+                .filter(([_, isChecked]) => isChecked)
+                .map(([key]) => {
+                    switch(key) {
+                        case 'piscina': return 'Piscina';
+                        case 'pozo': return 'Pozo de agua';
+                        case 'planta': return 'Planta eléctrica';
+                        case 'marmol': return 'Piso de mármol';
+                        default: return key;
+                    }
+                }).join(', ');
+
+            const payload = {
+                ubicacion: formData.ubicacion,
+                superficie: formData.superficie,
+                distribucion: formData.distribucion,
+                estado: `${formData.edad} años de antigüedad, estado: ${formData.estadoFisico}`,
+                extras: selectedExtras || 'Ninguno'
+            };
+
             const response = await fetch('/.netlify/functions/appraiser', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...(token && { 'Authorization': `Bearer ${await token}` })
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             const responseData = await response.json();
@@ -105,14 +142,18 @@ const AppraiserModule: React.FC = () => {
                                 <MapPin className="w-4 h-4 text-slate-400" />
                                 Ubicación / Sector
                             </label>
-                            <input
+                            <select
                                 required
                                 name="ubicacion"
                                 value={formData.ubicacion}
                                 onChange={handleChange}
-                                placeholder="Ej: Sector La Virginia..."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
-                            />
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                            >
+                                <option value="" disabled>Seleccionar Sector...</option>
+                                {MARACAIBO_SECTORS.map(sector => (
+                                    <option key={sector} value={sector}>{sector}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div>
@@ -145,34 +186,73 @@ const AppraiserModule: React.FC = () => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                                <Building className="w-4 h-4 text-slate-400" />
-                                Edad y Estado Físico
-                            </label>
-                            <input
-                                required
-                                name="estado"
-                                value={formData.estado}
-                                onChange={handleChange}
-                                placeholder="Ej: 15 años de antigüedad, para actualizar"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <Building className="w-4 h-4 text-slate-400" />
+                                    Edad (Años)
+                                </label>
+                                <select
+                                    required
+                                    name="edad"
+                                    value={formData.edad}
+                                    onChange={handleChange}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                                >
+                                    <option value="" disabled>Seleccionar</option>
+                                    <option value="A estrenar">A estrenar (0)</option>
+                                    {Array.from({ length: 100 }, (_, i) => i + 1).map(year => (
+                                        <option key={year} value={year}>{year}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-slate-400" />
+                                    Estado Físico
+                                </label>
+                                <select
+                                    required
+                                    name="estadoFisico"
+                                    value={formData.estadoFisico}
+                                    onChange={handleChange}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
+                                >
+                                    <option value="" disabled>Seleccionar</option>
+                                    <option value="Obra Gris">Obra Gris</option>
+                                    <option value="Obra Blanca">Obra Blanca</option>
+                                    <option value="Para Actualizar">Para Actualizar</option>
+                                    <option value="Bien Conservado">Bien Conservado</option>
+                                    <option value="Actualizado">Actualizado</option>
+                                    <option value="Totalmente Nuevo / Lujo">Totalmente Nuevo / Lujo</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                            <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
                                 <Plus className="w-4 h-4 text-slate-400" />
-                                Extras (Opcional)
+                                Extras Adicionales
                             </label>
-                            <textarea
-                                name="extras"
-                                value={formData.extras}
-                                onChange={handleChange}
-                                rows={2}
-                                placeholder="Ej: Planta eléctrica 10kva, pozo de agua, mármol..."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium resize-none"
-                            />
+                            <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+                                {[
+                                    { id: 'piscina', label: 'Piscina' },
+                                    { id: 'pozo', label: 'Pozo de Agua' },
+                                    { id: 'planta', label: 'Planta Eléctrica' },
+                                    { id: 'marmol', label: 'Piso de Mármol' }
+                                ].map((item) => (
+                                    <label key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            name={item.id}
+                                            checked={formData.extras[item.id as keyof typeof formData.extras]}
+                                            onChange={handleCheckboxChange}
+                                            className="w-5 h-5 rounded text-orange-500 focus:ring-orange-500/20 border-slate-300"
+                                        />
+                                        <span className="text-sm font-bold text-slate-700">{item.label}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
 
                         {error && (
