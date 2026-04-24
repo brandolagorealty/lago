@@ -68,6 +68,8 @@ Actúa como un experto analista inmobiliario cazador de propiedades.
 A continuación recibirás una lista de resultados extraídos de la web (títulos, descripciones cortas y URLs).
 Determina cuáles son publicaciones reales valiosas (preferiblemente trato directo) basándonos en tu análisis.
 
+REGLA ESTRICTA: DESCARTA Y ELIMINA CUALQUIER PROPIEDAD QUE NO ESTÉ EN MARACAIBO O EL ESTADO ZULIA (VENEZUELA). Si el texto menciona otros países (ej. Chile, México) o ciudades fuera del Zulia, ignóralo por completo.
+
 ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
 [
   {
