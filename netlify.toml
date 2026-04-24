@@ -13,9 +13,9 @@
   to = "/index.html"
   status = 200
 
-# Recordatorios diarios a las 12:00 PM hora Venezuela (UTC-4 = 16:00 UTC)
+# Recordatorios cada 12 horas
 [functions."daily-reminders"]
-  schedule = "0 16 * * *"
+  schedule = "0 */12 * * *"
 
 # Tiempo extra para funciones de IA (OpenRouter free tier puede tardar hasta 20s)
 [functions."prospector"]

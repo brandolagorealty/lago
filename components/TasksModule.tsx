@@ -107,6 +107,22 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 t.id === taskId ? { ...t, status: task.status } : t
             ));
             alert("Error al mover la tarea.");
+        } else {
+            // Notificar estado nuevo vía WhatsApp
+            if (task.assignee_id) {
+                const session = await supabase.auth.getSession();
+                const accessToken = session.data.session?.access_token;
+                if (accessToken) {
+                    fetch('/.netlify/functions/task-updated-notify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${accessToken}`,
+                        },
+                        body: JSON.stringify({ taskId: task.id, newStatus: newStatus }),
+                    }).catch(err => console.warn('[Notify Update] failed:', err));
+                }
+            }
         }
     };
 
@@ -182,6 +198,12 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                     'Authorization': `Bearer ${accessToken}`,
                                 },
                                 body: JSON.stringify({ taskId: data.id, assigneeId: data.assignee_id }),
+                            }).then(async res => {
+                                const payload = await res.json();
+                                console.log('[Notify]', payload);
+                                if (payload.results?.whatsapp?.success === false) {
+                                    alert('Error de WhatsApp devuelto por Meta:\\n' + JSON.stringify(payload.results.whatsapp.reason, null, 2));
+                                }
                             }).catch(err => console.warn('[Notify] Background notification failed:', err));
                         }
                     }
