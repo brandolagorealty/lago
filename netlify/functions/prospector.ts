@@ -57,51 +57,71 @@ export const handler = async (event: any) => {
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5 segs max por link para evitar timeout global
                         
-                        const response = await fetch(item.link, { 
-                            signal: controller.signal,
-                            headers: { 
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                                'Accept-Language': 'es-419,es;q=0.9,en;q=0.8'
-                            }
-                        });
-                        clearTimeout(timeoutId);
+                        let validText = '';
+                        let firstImageUrl = '';
                         
-                        if (!response.ok) throw new Error('Bad status');
-                        const html = await response.text();
-                        const $ = cheerio.load(html);
-                        
-                        // Extraer primera imagen válida (evitando logos)
-                        let firstImageUrl = $('meta[property="og:image"]').attr('content') || '';
-                        
-                        const isBadImage = (url: string) => {
-                            if (!url) return true;
-                            const lowerUrl = url.toLowerCase();
-                            return lowerUrl.includes('logo') || 
-                                   lowerUrl.includes('icon') || 
-                                   lowerUrl.includes('avatar') || 
-                                   lowerUrl.includes('blank') || 
-                                   lowerUrl.includes('default');
-                        };
+                        const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || 'fc-a33cfdb538db49bb8276f21afa0dea95';
+                        const isSocialMedia = item.link.includes('facebook.com') || item.link.includes('instagram.com') || item.link.includes('tiktok.com');
 
-                        if (isBadImage(firstImageUrl)) {
-                            firstImageUrl = '';
-                            $('img').each((i, el) => {
-                                const src = $(el).attr('src') || $(el).attr('data-src');
-                                if (src && src.startsWith('http') && !firstImageUrl) {
-                                    if (!isBadImage(src)) {
-                                        firstImageUrl = src;
-                                    }
+                        if (FIRECRAWL_API_KEY && isSocialMedia) {
+                            // Usar Firecrawl para sitios difíciles (Meta)
+                            const controllerFC = new AbortController();
+                            const timeoutFC = setTimeout(() => controllerFC.abort(), 8000); // 8s max para Firecrawl
+                            const responseFC = await fetch('https://api.firecrawl.dev/v1/scrape', {
+                                method: 'POST',
+                                signal: controllerFC.signal,
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+                                },
+                                body: JSON.stringify({ url: item.link, formats: ['markdown'] })
+                            });
+                            clearTimeout(timeoutFC);
+                            
+                            if (responseFC.ok) {
+                                const dataFC = await responseFC.json();
+                                validText = dataFC.data?.markdown || item.snippet;
+                                firstImageUrl = dataFC.data?.metadata?.ogImage || dataFC.data?.metadata?.image || '';
+                            } else {
+                                throw new Error('Firecrawl failed');
+                            }
+                        } else {
+                            // Usar Cheerio interno (rápido y gratis para el resto)
+                            const response = await fetch(item.link, { 
+                                signal: controller.signal,
+                                headers: { 
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                                    'Accept-Language': 'es-419,es;q=0.9,en;q=0.8'
                                 }
                             });
-                        }
+                            
+                            if (!response.ok) throw new Error('Bad status');
+                            const html = await response.text();
+                            const $ = cheerio.load(html);
+                            
+                            firstImageUrl = $('meta[property="og:image"]').attr('content') || '';
+                            
+                            const isBadImage = (url: string) => {
+                                if (!url) return true;
+                                const lowerUrl = url.toLowerCase();
+                                return lowerUrl.includes('logo') || lowerUrl.includes('icon') || lowerUrl.includes('avatar') || lowerUrl.includes('blank') || lowerUrl.includes('default');
+                            };
 
-                        // Limpiar elementos no textuales
-                        $('script, style, noscript, iframe, img, svg, header, footer, nav, button').remove();
-                        const fullText = $('body').text().replace(/\s+/g, ' ').trim();
-                        
-                        // Si nos bloquean (ej: FB/IG) el texto es muy corto. Fallback al snippet.
-                        const validText = fullText.length > 150 ? fullText.substring(0, 3000) : item.snippet;
+                            if (isBadImage(firstImageUrl)) {
+                                firstImageUrl = '';
+                                $('img').each((i, el) => {
+                                    const src = $(el).attr('src') || $(el).attr('data-src');
+                                    if (src && src.startsWith('http') && !firstImageUrl && !isBadImage(src)) {
+                                        firstImageUrl = src;
+                                    }
+                                });
+                            }
+
+                            $('script, style, noscript, iframe, img, svg, header, footer, nav, button').remove();
+                            const fullText = $('body').text().replace(/\s+/g, ' ').trim();
+                            validText = fullText.length > 150 ? fullText.substring(0, 3000) : item.snippet;
+                        }
                         
                         let base64Image = null;
                         let mimeType = '';
