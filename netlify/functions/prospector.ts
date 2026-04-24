@@ -38,6 +38,7 @@ export const handler = async (event: any) => {
                     q: searchQuery,
                     gl: 've', // Venezuela
                     hl: 'es', // Español
+                    tbs: 'qdr:w', // Última semana (garantiza frescura)
                     num: 10 // Get top 10 results
                 })
             });
@@ -76,6 +77,7 @@ Determina cuáles son publicaciones reales valiosas (preferiblemente trato direc
 
 REGLA ESTRICTA 1: DESCARTA Y ELIMINA CUALQUIER PROPIEDAD QUE NO ESTÉ EN MARACAIBO O EL ESTADO ZULIA (VENEZUELA). Si el texto menciona otros países (ej. Chile, México) o ciudades fuera del Zulia, ignóralo por completo.
 REGLA ESTRICTA 2: EL USUARIO ESTÁ BUSCANDO EXCLUSIVAMENTE PROPIEDADES EN **${operacion ? operacion.toUpperCase() : 'VENTA O ALQUILER'}**. Si la publicación evidentemente es de la operación contraria (por ejemplo, buscas Alquiler y dice "Se Vende"), DESCÁRTALA POR COMPLETO Y NO LA INCLUYAS EN EL JSON.
+REGLA ESTRICTA 3: SI EL TEXTO MENCIONA A "ANGEL PINTON", "RED90", "REMAX", "CENTURY21", "RENTAHOUSE", "KELLER WILLIAMS", "INMOBILIARIA", "AGENTE INMOBILIARIO", "CORREDOR", "HONORARIOS", "CLIENTES", O SIMILARES, EL CAMPO "isAgent" **TIENE QUE SER TRUE OBLIGATORIAMENTE**. NO LO MARQUES COMO DUEÑO DIRECTO.
 
 ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
 [
@@ -85,7 +87,7 @@ ESTRUCTURA JSON REQUERIDA DE SALIDA (DEVUELVE UN ARRAY):
     "url": "Extrae la URL exacta proporcionada en el bloque",
     "isAgent": true o false,
     "operacion": "'Venta' o 'Alquiler' inferido",
-    "reasoning": "Por qué crees, según la descripción, que es dueño (isAgent=false) o agencia/asesor (isAgent=true). Palabras clave asesor: rentahouse, remax, century21, honorarios, somos agencia."
+    "reasoning": "Breve razón de por qué es dueño o agencia."
   }
 ]
 NO DEVUELVAS NADA MÁS QUE EL ARRAY JSON (MÁXIMO LOS 5 MEJORES, DESCARTA LA BASURA O ENLACES CAÍDOS).
