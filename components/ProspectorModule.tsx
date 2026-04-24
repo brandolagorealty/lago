@@ -20,6 +20,7 @@ export default function ProspectorModule() {
         tipoInmueble: '',
         ubicacion: '',
         keywords: '',
+        fuente: '',
         soloDuenos: true
     });
 
@@ -47,6 +48,7 @@ export default function ProspectorModule() {
         queryParts.push("Maracaibo");
         if (formData.soloDuenos) queryParts.push(`"dueño" OR "directo"`);
         if (formData.keywords) queryParts.push(formData.keywords);
+        if (formData.fuente) queryParts.push(`site:${formData.fuente}`);
         
         const finalQuery = queryParts.join(' ');
 
@@ -140,9 +142,23 @@ export default function ProspectorModule() {
                             name="keywords"
                             value={formData.keywords}
                             onChange={handleChange}
-                            placeholder="Palabras clave extra (Ej: amoblado, piscina)..."
+                            placeholder="Palabras clave extra (Ej: amoblado)..."
                             className="w-full pl-12 pr-4 py-3.5 text-md border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                         />
+                    </div>
+                    <div className="flex-1 w-full relative">
+                        <select 
+                            name="fuente" 
+                            value={formData.fuente} 
+                            onChange={handleChange} 
+                            className="w-full px-4 py-3.5 text-md border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none"
+                        >
+                            <option value="">Cualquier Portal (Búsqueda General)</option>
+                            <option value="instagram.com">Instagram</option>
+                            <option value="facebook.com">Facebook / Marketplace</option>
+                            <option value="mercadolibre.com.ve">MercadoLibre Inmuebles</option>
+                            <option value="tiktok.com">TikTok</option>
+                        </select>
                     </div>
                     <label className="flex items-center gap-3 cursor-pointer shrink-0 bg-indigo-50 px-4 py-3.5 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors">
                         <input type="checkbox" name="soloDuenos" checked={formData.soloDuenos} onChange={handleChange} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500/20" />
@@ -154,7 +170,7 @@ export default function ProspectorModule() {
                         className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
                     >
                         {loading ? (
-                            <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Buscando...</>
+                            <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Escaneo Profundo (~15s)...</>
                         ) : (
                             <><Search className="w-5 h-5" /> Buscar</>
                         )}

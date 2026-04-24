@@ -47,9 +47,48 @@ export const handler = async (event: any) => {
             const results: string[] = [];
             
             if (data.organic && Array.isArray(data.organic)) {
-                data.organic.slice(0, 8).forEach((item: any) => {
-                    if (item.title && item.snippet) {
-                        results.push(`TÍTULO: ${item.title}\nURL: ${item.link || ''}\nDESCRIPCIÓN: ${item.snippet}`);
+                // FASE 1: Deep Crawling - Tomamos los top 6 links para no exceder los 26s
+                const topLinks = data.organic.slice(0, 6);
+                
+                const crawlPromises = topLinks.map(async (item: any) => {
+                    if (!item.link) return null;
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5 segs max por link para evitar timeout global
+                        
+                        const response = await fetch(item.link, { 
+                            signal: controller.signal,
+                            headers: { 
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                                'Accept-Language': 'es-419,es;q=0.9,en;q=0.8'
+                            }
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) throw new Error('Bad status');
+                        const html = await response.text();
+                        const $ = cheerio.load(html);
+                        
+                        // Limpiar elementos no textuales
+                        $('script, style, noscript, iframe, img, svg, header, footer, nav, button').remove();
+                        const fullText = $('body').text().replace(/\s+/g, ' ').trim();
+                        
+                        // Si nos bloquean (ej: FB/IG) el texto es muy corto. Fallback al snippet.
+                        const validText = fullText.length > 150 ? fullText.substring(0, 3000) : item.snippet;
+                        
+                        return { title: item.title, link: item.link, text: validText };
+                    } catch (e) {
+                        // Fallback natural al snippet de Serper si la web bloquea el bot o tarda mucho
+                        return { title: item.title, link: item.link, text: item.snippet };
+                    }
+                });
+                
+                const crawledData = await Promise.all(crawlPromises);
+                
+                crawledData.forEach(item => {
+                    if (item) {
+                        results.push(`TÍTULO: ${item.title}\nURL: ${item.link || ''}\nTEXTO EXTRAÍDO: ${item.text}`);
                     }
                 });
             }
