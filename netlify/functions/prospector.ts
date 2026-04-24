@@ -71,14 +71,30 @@ export const handler = async (event: any) => {
                         const html = await response.text();
                         const $ = cheerio.load(html);
                         
-                        // Extraer primera imagen válida
-                        let firstImageUrl = '';
-                        $('img').each((i, el) => {
-                            const src = $(el).attr('src');
-                            if (src && src.startsWith('http') && !firstImageUrl) {
-                                firstImageUrl = src;
-                            }
-                        });
+                        // Extraer primera imagen válida (evitando logos)
+                        let firstImageUrl = $('meta[property="og:image"]').attr('content') || '';
+                        
+                        const isBadImage = (url: string) => {
+                            if (!url) return true;
+                            const lowerUrl = url.toLowerCase();
+                            return lowerUrl.includes('logo') || 
+                                   lowerUrl.includes('icon') || 
+                                   lowerUrl.includes('avatar') || 
+                                   lowerUrl.includes('blank') || 
+                                   lowerUrl.includes('default');
+                        };
+
+                        if (isBadImage(firstImageUrl)) {
+                            firstImageUrl = '';
+                            $('img').each((i, el) => {
+                                const src = $(el).attr('src') || $(el).attr('data-src');
+                                if (src && src.startsWith('http') && !firstImageUrl) {
+                                    if (!isBadImage(src)) {
+                                        firstImageUrl = src;
+                                    }
+                                }
+                            });
+                        }
 
                         // Limpiar elementos no textuales
                         $('script, style, noscript, iframe, img, svg, header, footer, nav, button').remove();
