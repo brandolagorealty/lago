@@ -58,6 +58,16 @@ exports.handler = async (event) => {
         };
     }
 
+    // Limpiar el registro huérfano en user_roles
+    const { error: roleCleanupError } = await supabaseAdmin
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+    if (roleCleanupError) {
+        console.warn('User deleted from auth but failed to clean user_roles:', roleCleanupError.message);
+    }
+
     return {
         statusCode: 200,
         body: JSON.stringify({ success: true, message: `User deleted successfully.` })
