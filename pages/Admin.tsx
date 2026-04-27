@@ -1222,25 +1222,45 @@ const Admin: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-slate-500">{new Date(role.created_at).toLocaleDateString()}</td>
                                                 <td className="px-6 py-4 text-right">
-                                                    {role.role !== 'superadmin' && (
+                                                    {role.user_id !== user?.id && (
                                                         <div className="flex justify-end gap-2">
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (!confirm(`¿Estás seguro de promover a ${role.email} a SUPERADMIN? Esta acción no se puede deshacer desde aquí.`)) return;
-                                                                    setToast({ message: 'Promoviendo...', type: 'success' });
-                                                                    const res = await propertyService.promoteUser(role.id);
-                                                                    if (res.success) {
-                                                                        setToast({ message: 'Promovido a Superadmin', type: 'success' });
-                                                                        fetchData();
-                                                                    } else {
-                                                                        setToast({ message: 'Error al promover: ' + res.error, type: 'error' });
-                                                                    }
-                                                                }}
-                                                                className="px-3 py-1 text-xs font-bold text-brand-green border border-brand-green/30 hover:bg-brand-green hover:text-white rounded-lg transition-colors"
-                                                                title="Promover a Superadmin"
-                                                            >
-                                                                Promover
-                                                            </button>
+                                                            {role.role !== 'superadmin' ? (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!confirm(`¿Estás seguro de promover a ${role.email} a SUPERADMIN?`)) return;
+                                                                        setToast({ message: 'Promoviendo...', type: 'success' });
+                                                                        const res = await propertyService.promoteUser(role.id);
+                                                                        if (res.success) {
+                                                                            setToast({ message: 'Promovido a Superadmin', type: 'success' });
+                                                                            fetchData();
+                                                                        } else {
+                                                                            setToast({ message: 'Error al promover: ' + res.error, type: 'error' });
+                                                                        }
+                                                                    }}
+                                                                    className="px-3 py-1 text-xs font-bold text-brand-green border border-brand-green/30 hover:bg-brand-green hover:text-white rounded-lg transition-colors"
+                                                                    title="Promover a Superadmin"
+                                                                >
+                                                                    ⬆ Promover
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!confirm(`¿Degradar a ${role.email} de Superadmin a Asesor?`)) return;
+                                                                        setToast({ message: 'Degradando...', type: 'success' });
+                                                                        const res = await propertyService.demoteUser(role.id);
+                                                                        if (res.success) {
+                                                                            setToast({ message: 'Degradado a Asesor', type: 'success' });
+                                                                            fetchData();
+                                                                        } else {
+                                                                            setToast({ message: 'Error al degradar: ' + res.error, type: 'error' });
+                                                                        }
+                                                                    }}
+                                                                    className="px-3 py-1 text-xs font-bold text-amber-600 border border-amber-500/30 hover:bg-amber-500 hover:text-white rounded-lg transition-colors"
+                                                                    title="Degradar a Asesor"
+                                                                >
+                                                                    ⬇ Degradar
+                                                                </button>
+                                                            )}
                                                             <button
                                                                 onClick={async () => {
                                                                     const userId = (role as any).user_id;

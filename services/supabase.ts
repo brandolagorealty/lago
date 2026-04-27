@@ -541,6 +541,31 @@ export const propertyService = {
     }
   },
 
+  // SECURITY: Demote Superadmin to Asesor via Edge Function
+  async demoteUser(rowId: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    
+    const sessionResult = await supabase.auth.getSession();
+    const token = sessionResult?.data?.session?.access_token;
+    if (!token) return { success: false, error: 'Not authenticated' };
+
+    try {
+        const response = await fetch('/.netlify/functions/demote-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ roleId: rowId }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+            return { success: true };
+        } else {
+            return { success: false, error: result.error || 'Server error' };
+        }
+    } catch (e: any) {
+        return { success: false, error: e.message || 'Connection error' };
+    }
+  },
+
   // SECURITY: Get Audit Logs
   async getAuditLogs(): Promise<AuditLog[]> {
     if (!supabase) return [];
