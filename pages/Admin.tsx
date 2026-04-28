@@ -5,6 +5,14 @@ import PropertyForm from '../components/PropertyForm';
 import TasksModule from '../components/TasksModule';
 import AppraiserModule from '../components/AppraiserModule';
 import ProspectorModule from '../components/ProspectorModule';
+import DashboardTab from '../components/DashboardTab';
+import CRMTab from '../components/CRMTab';
+import InventoryTab from '../components/InventoryTab';
+import TeamTab from '../components/TeamTab';
+import SecurityTab from '../components/SecurityTab';
+import AuditTab from '../components/AuditTab';
+import AgentFormModal from '../components/AgentFormModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus, UserRole, AuditLog } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -19,45 +27,7 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
-interface DeleteConfirmModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onConfirm: () => void;
-    title: string;
-}
 
-const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({ isOpen, onClose, onConfirm, title }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 overflow-hidden animate-in zoom-in duration-300">
-                <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
-                <div className="flex items-center justify-center w-16 h-16 bg-red-50 rounded-full mb-6 mx-auto">
-                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 text-center mb-2">¿Eliminar Propiedad?</h3>
-                <p className="text-slate-500 text-center mb-8">
-                    Estás a punto de eliminar <span className="font-semibold text-slate-700">"{title}"</span>. Esta acción es permanente y no se puede deshacer.
-                </p>
-                <div className="flex gap-3">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
-                    >
-                        Eliminar
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const Admin: React.FC = () => {
     const { signOut, user } = useAuth();
@@ -90,11 +60,8 @@ const Admin: React.FC = () => {
     const [isInviting, setIsInviting] = useState(false);
     const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-    // Cropper states
-    const [cropImgSrc, setCropImgSrc] = useState<string>('');
-    const imgRef = useRef<HTMLImageElement>(null);
-    const [crop, setCrop] = useState<Crop>();
-    const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+    // Responsive state
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         if (toast) {
@@ -117,24 +84,24 @@ const Admin: React.FC = () => {
             console.log('[DEBUG] Admin: Role fetched:', myRole);
             setCurrentUserRole(myRole as 'superadmin' | 'asesor');
 
-            // Fetch common data for all users
-            const [propsData, agentsData, leadsData] = await Promise.all([
-                propertyService.getAdminProperties(),
+            // Fetch common data for all users (page 0, large page size to get all for now)
+            const [propsResult, agentsData, leadsResult] = await Promise.all([
+                propertyService.getAdminProperties(0, 200),
                 propertyService.getAgents(),
-                propertyService.getLeads(),
+                propertyService.getLeads(0, 200),
             ]);
-            setProperties(propsData);
+            setProperties(propsResult.data);
             setAgents(agentsData);
-            setLeads(leadsData);
+            setLeads(leadsResult.data);
 
             // Only fetch sensitive security data for superadmins
             if (myRole === 'superadmin') {
-                const [rolesData, logsData] = await Promise.all([
+                const [rolesData, logsResult] = await Promise.all([
                     propertyService.getUserRoles(),
-                    propertyService.getAuditLogs()
+                    propertyService.getAuditLogs(0, 200)
                 ]);
                 setUserRoles(rolesData);
-                setAuditLogs(logsData);
+                setAuditLogs(logsResult.data);
             }
         } catch (error) {
             console.error('Error fetching admin data:', error);
@@ -259,42 +226,6 @@ const Admin: React.FC = () => {
         setPropertyToDelete(null);
     };
 
-    const handleSaveAgent = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setIsSavingAgent(true);
-        const form = e.currentTarget;
-        const formData = new FormData(form);
-
-        const agentData: any = {
-            name: (formData.get('name') as string),
-            role: (formData.get('role') as string),
-            email: (formData.get('email') as string),
-            phone: (formData.get('phone') as string),
-            // Use controlled state for avatar — FormData can't track imperatively-set .value
-            // Use null (not empty string) when no avatar so Supabase doesn't reject with 400
-            avatar: agentAvatarUrl || (formData.get('avatar_url') as string) || null,
-            bookingUrl: (formData.get('booking_url') as string)
-        };
-
-        let result;
-        if (editingAgent) {
-            result = await propertyService.updateAgent(editingAgent.id, agentData);
-        } else {
-            result = await propertyService.createAgent(agentData);
-        }
-
-        if (result.success) {
-            await fetchData();
-            setShowAgentForm(false);
-            setEditingAgent(null);
-            setAgentAvatarUrl('');
-            setToast({ message: editingAgent ? 'Asesor actualizado' : 'Asesor agregado', type: 'success' });
-        } else {
-            alert('Error: ' + result.error);
-        }
-        setIsSavingAgent(false);
-    };
-
     const handleDeleteAgent = async (id: string) => {
         if (!confirm('¿Estás seguro de eliminar este asesor?')) return;
         const result = await propertyService.deleteAgent(id);
@@ -304,62 +235,6 @@ const Admin: React.FC = () => {
         } else {
             setToast({ message: 'Error al eliminar: ' + result.error, type: 'error' });
         }
-    };
-
-    const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            setCrop(undefined);
-            setCompletedCrop(undefined);
-            const reader = new FileReader();
-            reader.addEventListener('load', () => setCropImgSrc(reader.result?.toString() || ''));
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    };
-
-    const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-        const { width, height } = e.currentTarget;
-        const crop = centerCrop(
-            makeAspectCrop({ unit: '%', width: 90 }, 1, width, height),
-            width, height
-        );
-        setCrop(crop);
-    };
-
-    const handleAvatarUpload = async () => {
-        if (!completedCrop || !imgRef.current) return;
-        setToast({ message: 'Preparando foto...', type: 'success' });
-        
-        const canvas = document.createElement('canvas');
-        const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
-        const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
-        canvas.width = completedCrop.width;
-        canvas.height = completedCrop.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        
-        ctx.drawImage(
-            imgRef.current,
-            completedCrop.x * scaleX,
-            completedCrop.y * scaleY,
-            completedCrop.width * scaleX,
-            completedCrop.height * scaleY,
-            0, 0, completedCrop.width, completedCrop.height
-        );
-
-        canvas.toBlob(async (blob) => {
-            if (!blob) return;
-            setToast({ message: 'Subiendo foto...', type: 'success' });
-            const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-            const url = await propertyService.uploadAgentAvatar(file);
-            if (url) {
-                // Use React state — this is the reliable way to pass the URL to handleSaveAgent
-                setAgentAvatarUrl(url);
-                setToast({ message: '✅ Foto subida con éxito', type: 'success' });
-                setCropImgSrc('');
-            } else {
-                setToast({ message: 'Error al subir foto. Revisa la consola.', type: 'error' });
-            }
-        }, 'image/jpeg', 0.95);
     };
 
     const filteredProperties = useMemo(() => {
@@ -595,8 +470,16 @@ const Admin: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-[#EFEFEF] flex animate-in fade-in duration-500 overflow-x-hidden">
+            {/* Mobile Menu Overlay */}
+            {isMobileMenuOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                ></div>
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-[#1A1A1A] border-r border-white/5 flex flex-col fixed h-screen z-50 text-[#EFEFEF]/70 shadow-2xl">
+            <aside className={`w-64 bg-[#1A1A1A] border-r border-white/5 flex flex-col fixed h-screen z-50 text-[#EFEFEF]/70 shadow-2xl transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                 <div 
                     className="h-20 flex items-center px-6 gap-3 border-b border-white/5 cursor-pointer shrink-0"
                     onClick={() => {
@@ -616,28 +499,28 @@ const Admin: React.FC = () => {
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'dashboard' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                     >
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        Dashboard
+                        Panel Principal
                     </button>
                     <button
                         onClick={() => setActiveTab('inventory')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'inventory' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                     >
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                        Inventario
+                        Propiedades
                     </button>
                     <button
                         onClick={() => setActiveTab('tasks')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'tasks' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                     >
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                        Lago Hub (Tareas)
+                        <span className="truncate">Tareas</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('crm')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'crm' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                     >
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        CRM
+                        Embudo CRM
                     </button>
                     <button
                         onClick={() => setActiveTab('appraiser')}
@@ -645,23 +528,20 @@ const Admin: React.FC = () => {
                     >
                         <div className="flex items-center gap-3">
                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                            Tasador AI
+                            Tasador Inteligente
                         </div>
                     </button>
                     <button
-                        onClick={() => setActiveTab('prospector')}
+                        onClick={() => { setActiveTab('prospector'); setIsMobileMenuOpen(false); }}
                         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'prospector' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-indigo-500 hover:bg-white/5'}`}
                     >
                         <div className="flex items-center gap-3">
                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                            Prospector AI
+                            Captación AI
                         </div>
-                        <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-[10px] font-black">
-                            NUEVO
-                        </span>
                     </button>
                     <button
-                        onClick={() => setActiveTab('team')}
+                        onClick={() => { setActiveTab('team'); setIsMobileMenuOpen(false); }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'team' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                     >
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -672,18 +552,18 @@ const Admin: React.FC = () => {
                         <>
                             <p className="px-4 text-[10px] font-bold text-[#EFEFEF]/40 uppercase tracking-widest mb-2 mt-8">Administración</p>
                             <button
-                                onClick={() => setActiveTab('seguridad')}
+                                onClick={() => { setActiveTab('seguridad'); setIsMobileMenuOpen(false); }}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'seguridad' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                             >
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                                Accesos
+                                <span className="truncate">Roles y Accesos</span>
                             </button>
                             <button
-                                onClick={() => setActiveTab('auditoria')}
+                                onClick={() => { setActiveTab('auditoria'); setIsMobileMenuOpen(false); }}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'auditoria' ? 'bg-[#1F5566] text-[#EFEFEF] shadow-lg shadow-[#1F5566]/20' : 'text-[#EFEFEF]/60 hover:bg-white/5 hover:text-[#EFEFEF]'}`}
                             >
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2v1M12 12h.01M12 16h.01M16 12h.01M16 16h.01" /></svg>
-                                Auditoría
+                                <span className="truncate">Auditoría</span>
                             </button>
                         </>
                     )}
@@ -706,8 +586,24 @@ const Admin: React.FC = () => {
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 ml-64 flex flex-col min-w-0 transition-all duration-300">
-                <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-8 md:px-10">
+            <div className="flex-1 md:ml-64 flex flex-col min-w-0 transition-all duration-300">
+                {/* Mobile Header */}
+                <div className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-brand-green rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        </div>
+                        <span className="font-serif font-bold text-slate-900 text-lg">Lago Realty</span>
+                    </div>
+                    <button 
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                    </button>
+                </div>
+
+                <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8 md:px-10">
                 {activeTab === 'dashboard' && (
                     <div className="space-y-6 animate-fade-in">
                         <div>
@@ -743,609 +639,54 @@ const Admin: React.FC = () => {
                 )}
 
                 {activeTab === 'crm' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div>
-                            <h1 className="text-3xl font-serif font-bold text-slate-900">CRM Prospectos</h1>
-                            <p className="text-slate-500">Gestión de oportunidades y embudo de ventas.</p>
-                        </div>
-
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Prospecto</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Alojamiento de Interés</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Estado (Pipeline)</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {leads.length === 0 ? (
-                                        <tr><td colSpan={3} className="px-6 py-12 text-center text-slate-400 font-medium italic">Sin prospectos registrados aún.</td></tr>
-                                    ) : (
-                                        leads.map(lead => (
-                                            <tr key={lead.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <p className="font-bold text-slate-900">{lead.name}</p>
-                                                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1">
-                                                        <span className="text-xs text-slate-500 font-medium whitespace-nowrap"><a href={`mailto:${lead.email}`} className="hover:text-brand-green">{lead.email}</a></span>
-                                                        {lead.phone && <span className="text-xs text-slate-500 font-medium whitespace-nowrap"><a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white rounded-xl transition-all font-bold group shadow-sm hover:shadow-md"><svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .011 5.403.008 12.039c0 2.12.54 4.188 1.564 6.09L0 24l6.101-1.599a11.82 11.82 0 005.946 1.599h.005c6.635 0 12.038-5.403 12.041-12.039a11.85 11.85 0 00-3.538-8.513z" /></svg>{lead.phone}</a></span>}
-                                                    </div>
-                                                    <div className="mt-3 p-3 bg-slate-100 rounded-xl text-xs text-slate-600 italic">
-                                                        "{lead.message}"
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {lead.property_id ? (
-                                                        <span className="text-xs font-bold text-brand-green bg-brand-green/10 px-2 py-1 rounded inline-block">
-                                                            {properties.find(p => p.id === lead.property_id)?.title || 'Propiedad ' + lead.property_id.slice(0, 6)}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs font-medium text-slate-400">Interés General</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <select
-                                                        value={lead.status}
-                                                        onChange={async (e) => {
-                                                            await propertyService.updateLeadStatus(lead.id, e.target.value);
-                                                            fetchData();
-                                                        }}
-                                                        className="bg-transparent border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-600 uppercase focus:ring-2 focus:ring-brand-green/20 outline-none"
-                                                    >
-                                                        <option value="new">💡 Nuevo (Sin Contacto)</option>
-                                                        <option value="contacted">📞 Contactado</option>
-                                                        <option value="visiting">🏠 Agendando Visita</option>
-                                                        <option value="negotiating">🤝 Negociando</option>
-                                                        <option value="closed">🎉 Ganado (Cierre)</option>
-                                                        <option value="lost">❌ Perdido</option>
-                                                    </select>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <CRMTab leads={leads} properties={properties} onRefresh={fetchData} />
                 )}
 
                 {activeTab === 'inventory' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
-                                <h1 className="text-3xl font-serif font-bold text-slate-900">Inventario Global</h1>
-                                <p className="text-slate-500">Supervisión técnica de activos y asignaciones.</p>
-                            </div>
-                            <div className="flex gap-3">
-                                {agentFilter && (
-                                    <button
-                                        onClick={() => setAgentFilter(null)}
-                                        className="px-4 py-2 rounded-xl bg-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-300 transition-colors"
-                                    >
-                                        Limpiar Filtro Agente
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setShowForm(true)}
-                                    className="bg-brand-green text-white px-6 py-3 rounded-xl font-bold hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20"
-                                >
-                                    + Nueva Propiedad
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Inventory Filters */}
-                        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-                            <div className="flex-1 w-full relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                </span>
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por título, ID o ubicación..."
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
-                                    value={textFilter}
-                                    onChange={(e) => setTextFilter(e.target.value)}
-                                />
-                            </div>
-                            <div className="w-full md:w-64">
-                                <select
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all uppercase"
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value as PropertyStatus | 'all')}
-                                >
-                                    <option value="all">Todos los estados</option>
-                                                    <option value="draft">📝 Borradores</option>
-                                    <option value="available">✨ Disponibles</option>
-                                    <option value="reserved">⏳ Reservadas</option>
-                                    <option value="sold">🎉 Vendidas</option>
-                                    <option value="rented">🔑 Alquiladas</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
-                            <div className="overflow-x-auto custom-scrollbar">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Propiedad</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Destacar</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Estatus</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Precio</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Agente Asignado</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {isLoading ? (
-                                            Array(5).fill(0).map((_, i) => (
-                                                <tr key={i} className="animate-pulse">
-                                                    <td colSpan={5} className="px-6 py-8"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
-                                                </tr>
-                                            ))
-                                        ) : filteredProperties.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No se encontraron propiedades.</td>
-                                            </tr>
-                                        ) : filteredProperties.map(property => (
-                                            <tr
-                                                key={property.id}
-                                                className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                                                onClick={() => setSelectedProperty(property)}
-                                            >
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="relative">
-                                                            <img src={property.image} className="w-12 h-12 rounded-lg object-cover shadow-sm group-hover:scale-105 transition-transform" />
-                                                            {!property.isPublished && (
-                                                                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-lg ring-2 ring-white uppercase">Borrador</div>
-                                                            )}
-                                                        </div>
-                                                        <div className="max-w-[200px]">
-                                                            <p
-                                                                className="font-bold text-slate-900 leading-tight truncate hover:text-brand-green hover:underline cursor-pointer transition-colors"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setEditingProperty(property);
-                                                                }}
-                                                                title="Clic para editar"
-                                                            >{property.title}</p>
-                                                            <p className="text-xs text-slate-400">{property.location}</p>
-                                                            {property.agentNotes && property.agentNotes.length > 0 && (
-                                                                <div className="mt-1 flex items-center gap-1 text-[10px] text-brand-green font-bold">
-                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-                                                                    <span className="truncate max-w-[150px]">{property.agentNotes[0].text}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            const newFeatured = !property.featured;
-                                                            const result = await propertyService.updateProperty(property.id, { featured: newFeatured });
-                                                            if (result.success) {
-                                                                setProperties(prev => prev.map(p => p.id === property.id ? { ...p, featured: newFeatured } : p));
-                                                                setToast({ message: newFeatured ? 'Propiedad marcada como destacada' : 'Propiedad removida de destacadas', type: 'success' });
-                                                            }
-                                                        }}
-                                                        className={`p-2 rounded-full transition-all active:scale-90 ${property.featured ? 'text-amber-400 bg-amber-50 shadow-inner' : 'text-slate-200 hover:text-amber-300 hover:bg-slate-50'}`}
-                                                        title={property.featured ? 'Remover de destacadas' : 'Marcar como destacada'}
-                                                    >
-                                                        <svg className={`w-6 h-6 ${property.featured ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                                        </svg>
-                                                    </button>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <select
-                                                        className="bg-transparent border-none text-[10px] uppercase font-bold text-slate-500 focus:ring-0 cursor-pointer p-0 mb-1 block"
-                                                        value={property.status}
-                                                        onChange={(e) => updatePropertyStatus(property.id, e.target.value as PropertyStatus)}
-                                                    >
-                                                        <option value="available">Disponible</option>
-                                                        <option value="reserved">Reservada</option>
-                                                        <option value="sold">Vendida</option>
-                                                        <option value="rented">Alquilada</option>
-                                                    </select>
-                                                    <StatusBadge status={property.status} />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-bold text-slate-700">{formatCurrency(property.price)}</p>
-                                                    <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{property.listingType === 'sale' ? 'Venta' : 'Alquiler'}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex -space-x-3 overflow-hidden">
-                                                            {property.agentIds && property.agentIds.length > 0 ? (
-                                                                property.agentIds.slice(0, 3).map(id => {
-                                                                    const agent = agents.find(a => a.id === id);
-                                                                    return agent ? (
-                                                                        <img
-                                                                            key={id}
-                                                                            className="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover"
-                                                                            src={agent.avatar}
-                                                                            title={agent.name}
-                                                                        />
-                                                                    ) : null;
-                                                                })
-                                                            ) : (
-                                                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 font-bold ring-2 ring-white">?</div>
-                                                            )}
-                                                            {property.agentIds && property.agentIds.length > 3 && (
-                                                                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 ring-2 ring-white">
-                                                                    +{property.agentIds.length - 3}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-xs font-bold text-slate-500 ml-1">
-                                                            {property.agentIds?.length || 0}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <button
-                                                            onClick={async (e) => {
-                                                                e.stopPropagation();
-                                                                const newPublished = !property.isPublished;
-                                                                const result = await propertyService.updateProperty(property.id, { isPublished: newPublished });
-                                                                if (result.success) {
-                                                                    setProperties(prev => prev.map(p => p.id === property.id ? { ...p, isPublished: newPublished } : p));
-                                                                    setToast({ message: newPublished ? 'Propiedad publicada' : 'Movida a borradores', type: 'success' });
-                                                                }
-                                                            }}
-                                                            className={`p-2 transition-colors hover:bg-white rounded-full ${
-                                                                property.isPublished 
-                                                                    ? 'text-slate-400 hover:text-amber-500' 
-                                                                    : 'text-amber-500 hover:text-brand-green'
-                                                            }`}
-                                                            title={property.isPublished ? 'Mover a Borradores' : 'Publicar'}
-                                                        >
-                                                            {property.isPublished ? (
-                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                                                            ) : (
-                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setEditingProperty(property);
-                                                            }}
-                                                            className="p-2 text-slate-400 hover:text-brand-green transition-colors hover:bg-white rounded-full"
-                                                            title="Editar"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                                        </button>
-                                                        {currentUserRole === 'superadmin' && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setPropertyToDelete(property);
-                                                                }}
-                                                                className="p-2 text-slate-400 hover:text-red-600 transition-colors hover:bg-white rounded-full"
-                                                                title="Eliminar"
-                                                            >
-                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+                    <InventoryTab
+                        properties={properties}
+                        agents={agents}
+                        currentUserRole={currentUserRole}
+                        isLoading={isLoading}
+                        agentFilter={agentFilter}
+                        onClearAgentFilter={() => setAgentFilter(null)}
+                        onShowForm={() => setShowForm(true)}
+                        onEditProperty={setEditingProperty}
+                        onSelectProperty={setSelectedProperty}
+                        onDeleteProperty={setPropertyToDelete}
+                        onPropertiesChange={setProperties}
+                        setToast={setToast}
+                    />
                 )}
 
                 {activeTab === 'team' && (
-                    <div className="space-y-8 animate-fade-in">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-serif font-bold text-slate-900">Equipo de Ventas</h1>
-                                <p className="text-slate-500">Gestión de asesores y rendimiento de cartera.</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setEditingAgent(null);
-                                    setAgentAvatarUrl('');
-                                    setShowAgentForm(true);
-                                }}
-                                className="px-6 py-3 bg-brand-green text-white rounded-2xl font-bold shadow-lg shadow-brand-green/20 hover:scale-105 transition-all flex items-center gap-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                                Agregar Asesor
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {statsByAgent.map(agent => (
-                                <div key={agent.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="relative">
-                                            <img src={agent.avatar} className="w-16 h-16 rounded-2xl object-cover shadow-lg" />
-                                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-4 border-white rounded-full"></div>
-                                        </div>
-                                        <div className="flex-grow">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-slate-900 leading-tight">{agent.name}</h3>
-                                                    <p className="text-xs text-brand-green font-bold uppercase tracking-wider">{agent.role}</p>
-                                                </div>
-                                                <div className="flex gap-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            const a = agents.find(a => a.id === agent.id) || null;
-                                                            setEditingAgent(a);
-                                                            setAgentAvatarUrl(a?.avatar || '');
-                                                            setShowAgentForm(true);
-                                                        }}
-                                                        className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
-                                                        title="Editar Datos"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteAgent(agent.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
-                                                        title="Eliminar Asesor"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 mb-6">
-                                        <div className="bg-slate-50 p-4 rounded-2xl">
-                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Valor Cartera</p>
-                                            <p className="font-bold text-slate-900 truncate">{formatCurrency(agent.totalValue)}</p>
-                                        </div>
-                                        <div className="bg-slate-50 p-4 rounded-2xl">
-                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Propiedades</p>
-                                            <p className="font-bold text-slate-900">{agent.totalProps}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div>
-                                            <div className="flex justify-between text-xs font-bold mb-2">
-                                                <span className="text-slate-500 text-[10px] uppercase">Tasa de Cierre</span>
-                                                <span className="text-brand-green">{agent.totalProps > 0 ? Math.round((agent.soldCount / agent.totalProps) * 100) : 0}%</span>
-                                            </div>
-                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-brand-green transition-all duration-1000 shadow-[0_0_10px_rgba(30,195,129,0.3)]"
-                                                    style={{ width: `${agent.totalProps > 0 ? (agent.soldCount / agent.totalProps) * 100 : 0}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-
-                                        <div className="border-t border-slate-50 pt-4">
-                                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Ventas vs Tiempo</p>
-                                            <PerformanceChart data={agent.monthlySales} />
-                                        </div>
-
-                                        <div className="flex items-center justify-between text-[11px] font-bold bg-slate-50 p-3 rounded-xl">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                                <span className="text-slate-600">{agent.availableCount} Libres</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-slate-300"></div>
-                                                <span className="text-slate-600">{agent.soldCount} Cerradas</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={() => {
-                                            setAgentFilter(agent.id);
-                                            setActiveTab('inventory');
-                                        }}
-                                        className="w-full mt-6 py-3 rounded-xl border border-slate-100 text-sm font-bold text-slate-600 hover:bg-brand-green hover:text-white hover:border-brand-green transition-all active:scale-[0.98]"
-                                    >
-                                        Ver Cartera en Inventario
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <TeamTab
+                        agents={agents}
+                        properties={properties}
+                        onEditAgent={(agent) => {
+                            setEditingAgent(agent);
+                            setAgentAvatarUrl(agent.avatar);
+                            setShowAgentForm(true);
+                        }}
+                        onDeleteAgent={handleDeleteAgent}
+                        onShowAgentForm={() => {
+                            setEditingAgent(null);
+                            setAgentAvatarUrl('');
+                            setShowAgentForm(true);
+                        }}
+                        onFilterByAgent={(agentId) => {
+                            setAgentFilter(agentId);
+                            setActiveTab('inventory');
+                        }}
+                    />
                 )}
 
                 {activeTab === 'seguridad' && currentUserRole === 'superadmin' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div>
-                            <h1 className="text-3xl font-serif font-bold text-slate-900">Control de Accesos</h1>
-                            <p className="text-slate-500">Gestiona los permisos de los asesores en el sistema.</p>
-                        </div>
-                        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6">Invitar Nuevo Asesor</h2>
-                            <p className="text-sm text-slate-500 mb-6">
-                                Introduce el correo corporativo del asesor. Le llegará un correo de bienvenida con el logo de Lago Realty y un enlace para establecer su contraseña.
-                            </p>
-                            <div className="flex gap-3 mb-4">
-                                <input
-                                    type="email"
-                                    placeholder="asesor@lagorealty.com.ve"
-                                    value={inviteEmail}
-                                    onChange={(e) => setInviteEmail(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleInviteUser()}
-                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20 text-sm font-medium"
-                                />
-                                <button
-                                    onClick={handleInviteUser}
-                                    disabled={isInviting || !inviteEmail}
-                                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
-                                >
-                                    {isInviting && (
-                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    )}
-                                    {isInviting ? 'Enviando...' : 'Enviar Invitación'}
-                                </button>
-                            </div>
-                            {inviteResult && (
-                                <div className={`p-4 rounded-xl text-sm font-medium ${inviteResult.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                                    {inviteResult.message}
-                                </div>
-                            )}
-                            <div className="mt-8">
-                                <h2 className="text-xl font-bold text-slate-900 mb-4">Usuarios Activos en el Sistema</h2>
-                                <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Email</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Rol</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha Ingreso</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {userRoles.map((role: UserRole) => (
-                                            <tr key={role.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-900">{role.email}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${role.role === 'superadmin' ? 'bg-purple-100 text-purple-700' : 'bg-brand-green/10 text-brand-green'}`}>
-                                                        {role.role.toUpperCase()}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-slate-500">{new Date(role.created_at).toLocaleDateString()}</td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {role.user_id !== user?.id && (
-                                                        <div className="flex justify-end gap-2">
-                                                            {role.role !== 'superadmin' ? (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        if (!confirm(`¿Estás seguro de promover a ${role.email} a SUPERADMIN?`)) return;
-                                                                        setToast({ message: 'Promoviendo...', type: 'success' });
-                                                                        const res = await propertyService.promoteUser(role.id);
-                                                                        if (res.success) {
-                                                                            setToast({ message: 'Promovido a Superadmin', type: 'success' });
-                                                                            fetchData();
-                                                                        } else {
-                                                                            setToast({ message: 'Error al promover: ' + res.error, type: 'error' });
-                                                                        }
-                                                                    }}
-                                                                    className="px-3 py-1 text-xs font-bold text-brand-green border border-brand-green/30 hover:bg-brand-green hover:text-white rounded-lg transition-colors"
-                                                                    title="Promover a Superadmin"
-                                                                >
-                                                                    ⬆ Promover
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        if (!confirm(`¿Degradar a ${role.email} de Superadmin a Asesor?`)) return;
-                                                                        setToast({ message: 'Degradando...', type: 'success' });
-                                                                        const res = await propertyService.demoteUser(role.id);
-                                                                        if (res.success) {
-                                                                            setToast({ message: 'Degradado a Asesor', type: 'success' });
-                                                                            fetchData();
-                                                                        } else {
-                                                                            setToast({ message: 'Error al degradar: ' + res.error, type: 'error' });
-                                                                        }
-                                                                    }}
-                                                                    className="px-3 py-1 text-xs font-bold text-amber-600 border border-amber-500/30 hover:bg-amber-500 hover:text-white rounded-lg transition-colors"
-                                                                    title="Degradar a Asesor"
-                                                                >
-                                                                    ⬇ Degradar
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                onClick={async () => {
-                                                                    const userId = (role as any).user_id;
-                                                                    if (!userId) {
-                                                                        setToast({ message: 'Este usuario no tiene un ID asociado', type: 'error' });
-                                                                        return;
-                                                                    }
-                                                                    if (!confirm(`¿Estás seguro de ELIMINAR a ${role.email}?`)) return;
-                                                                    setToast({ message: 'Eliminando...', type: 'success' });
-                                                                    const res = await propertyService.deleteAuthUser(userId);
-                                                                    if (res.success) {
-                                                                        setToast({ message: 'Usuario eliminado exitosamente', type: 'success' });
-                                                                        fetchData();
-                                                                    } else {
-                                                                        setToast({ message: 'Error al eliminar: ' + res.error, type: 'error' });
-                                                                    }
-                                                                }}
-                                                                className="px-3 py-1 text-xs font-bold text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
-                                                                title="Eliminar Asesor"
-                                                            >
-                                                                Eliminar
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <SecurityTab userRoles={userRoles} onRefresh={fetchData} setToast={setToast} />
                 )}
 
-
                 {activeTab === 'auditoria' && currentUserRole === 'superadmin' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div>
-                            <h1 className="text-3xl font-serif font-bold text-slate-900">Historial de Auditoría</h1>
-                            <p className="text-slate-500">Registro inalterable de cada cambio realizado en el inventario.</p>
-                        </div>
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 border-b border-slate-200">
-                                    <tr>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Usuario</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Acción</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Propiedad ID</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                                    {auditLogs.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic">No hay registros de auditoría aún.</td>
-                                        </tr>
-                                    ) : (
-                                        auditLogs.map((log: AuditLog) => (
-                                            <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-4 text-sm text-slate-500">
-                                                    {new Date(log.created_at).toLocaleString()}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-medium text-slate-900">{log.user_email || 'Sistema'}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                        log.action === 'INSERT' ? 'bg-green-100 text-green-700' : 
-                                                        log.action === 'UPDATE' ? 'bg-blue-100 text-blue-700' : 
-                                                        'bg-red-100 text-red-700'
-                                                    }`}>
-                                                        {log.action}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-xs font-mono text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={log.record_id}>
-                                                    {log.record_id}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <AuditTab auditLogs={auditLogs} />
                 )}
                 {/* Modulo de Tareas / Lago Hub */}
                 {activeTab === 'tasks' && (
@@ -1408,115 +749,45 @@ const Admin: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Delete Confirm Modal (Inline replacement) */}
             {propertyToDelete && (
-                <DeleteConfirmModal
-                    isOpen={!!propertyToDelete}
-                    title={propertyToDelete.title}
-                    onClose={() => setPropertyToDelete(null)}
-                    onConfirm={() => handleDeleteProperty(propertyToDelete.id)}
-                />
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setPropertyToDelete(null)}></div>
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 overflow-hidden animate-in zoom-in duration-300">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                        <div className="flex items-center justify-center w-16 h-16 bg-red-50 rounded-full mb-6 mx-auto">
+                            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 text-center mb-2">¿Eliminar Propiedad?</h3>
+                        <p className="text-slate-500 text-center mb-8">
+                            Estás a punto de eliminar <span className="font-semibold text-slate-700">"{propertyToDelete.title}"</span>. Esta acción es permanente y no se puede deshacer.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPropertyToDelete(null)}
+                                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleDeleteProperty(propertyToDelete.id)}
+                                className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Agent Form Modal */}
-            {showAgentForm && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setShowAgentForm(false); setAgentAvatarUrl(''); }}></div>
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-300">
-                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <div>
-                                <h2 className="text-2xl font-serif font-bold text-slate-900">{editingAgent ? 'Editar Asesor' : 'Agregar Asesor'}</h2>
-                                <p className="text-slate-500 text-sm">Gestiona la información del miembro de tu equipo.</p>
-                            </div>
-                            <button onClick={() => { setShowAgentForm(false); setAgentAvatarUrl(''); }} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-                        <form onSubmit={handleSaveAgent} className="p-8 space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Nombre Completo</label>
-                                    <input required name="name" defaultValue={editingAgent?.name} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Cargo / Especialidad</label>
-                                    <input required name="role" defaultValue={editingAgent?.role} placeholder="Ej: Especialista en Captaciones" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Email</label>
-                                    <input type="email" name="email" defaultValue={editingAgent?.email} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Teléfono</label>
-                                    <input name="phone" defaultValue={editingAgent?.phone} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Foto del Asesor</label>
-                                    <label className="text-xs font-bold text-brand-green hover:underline cursor-pointer uppercase tracking-widest flex items-center gap-1">
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                        Subir desde PC
-                                        <input type="file" className="hidden" accept="image/*" onChange={onSelectFile} />
-                                    </label>
-                                </div>
-                                <input 
-                                    name="avatar_url"
-                                    value={agentAvatarUrl}
-                                    onChange={e => setAgentAvatarUrl(e.target.value)}
-                                    placeholder="https://... o sube una foto desde tu PC" 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" 
-                                />
-                                {agentAvatarUrl && (
-                                    <div className="relative h-24 w-24 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
-                                        <img src={agentAvatarUrl} alt="Preview" className="w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display='none'; }} />
-                                    </div>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Link de Reservas (Calendly/Google/Zoom)</label>
-                                <input 
-                                    name="booking_url" 
-                                    defaultValue={editingAgent?.bookingUrl} 
-                                    placeholder="https://calendly.com/..." 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-green/20" 
-                                />
-                            </div>
-                            <button disabled={isSavingAgent} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center">
-                                {isSavingAgent && (
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                )}
-                                {isSavingAgent ? 'Guardando...' : (editingAgent ? 'Guardar Cambios' : 'Registrar Asesor')}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {cropImgSrc && (
-                <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setCropImgSrc('')}></div>
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in duration-300">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 className="font-bold text-slate-900 text-lg">Recortar Foto de Perfil</h3>
-                            <button type="button" onClick={() => setCropImgSrc('')} className="p-2 text-slate-400 hover:bg-white rounded-full transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                        </div>
-                        <div className="p-6 overflow-y-auto flex-grow flex flex-col items-center bg-slate-100/50">
-                            <ReactCrop crop={crop} onChange={(_, percentCrop) => setCrop(percentCrop)} onComplete={(c) => setCompletedCrop(c)} aspect={1} circularCrop>
-                                <img ref={imgRef} alt="Crop" src={cropImgSrc} onLoad={onImageLoad} className="max-h-[50vh] object-contain rounded-xl shadow-sm" />
-                            </ReactCrop>
-                        </div>
-                        <div className="p-6 border-t border-slate-100 flex gap-4 bg-white">
-                            <button type="button" onClick={() => setCropImgSrc('')} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-                            <button type="button" onClick={handleAvatarUpload} className="flex-1 py-3 font-bold text-white bg-brand-green rounded-xl hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20">Aplicar y Subir</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AgentFormModal
+                isOpen={showAgentForm}
+                onClose={() => { setShowAgentForm(false); setAgentAvatarUrl(''); }}
+                onSave={fetchData}
+                editingAgent={editingAgent}
+                setToast={setToast}
+            />
         </div>
     );
 };

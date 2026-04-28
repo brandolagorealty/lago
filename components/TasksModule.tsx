@@ -153,7 +153,8 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
     };
 
     const handleSaveTask = async () => {
-        if (!formData.title) return alert('El título es requerido');
+        if (!formData.title?.trim()) return alert('El título es requerido');
+        if (!formData.due_date && !editingTask) return alert('La fecha límite es obligatoria para crear una tarea.');
         
         setIsSaving(true);
         try {
@@ -190,6 +191,11 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                         const session = await supabase.auth.getSession();
                         const accessToken = session.data.session?.access_token;
                         if (accessToken) {
+                            // Obtener nombres de los asesores asignados para el toast
+                            const assignedAgentNames = data.assignee_ids
+                                .map((id: string) => agents.find(a => a.id === id)?.name)
+                                .filter(Boolean);
+
                             fetch('/.netlify/functions/task-created-notify', {
                                 method: 'POST',
                                 headers: {
@@ -200,8 +206,27 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                             }).then(async res => {
                                 const payload = await res.json();
                                 console.log('[Notify]', payload);
-                                if (payload.results?.whatsapp?.success === false) {
-                                    alert('Error de WhatsApp devuelto por Meta:\\n' + JSON.stringify(payload.results.whatsapp.reason, null, 2));
+                                if (payload.results?.whatsapp) {
+                                    const waResults = Array.isArray(payload.results.whatsapp) ? payload.results.whatsapp : [payload.results.whatsapp];
+                                    const successNames = waResults
+                                        .filter((r: any) => r.success)
+                                        .map((r: any) => {
+                                            const agent = agents.find(a => a.id === r.agentId);
+                                            return agent?.name || 'Desconocido';
+                                        });
+                                    const failedNames = waResults
+                                        .filter((r: any) => !r.success)
+                                        .map((r: any) => {
+                                            const agent = agents.find(a => a.id === r.agentId);
+                                            return agent?.name || 'Desconocido';
+                                        });
+
+                                    if (successNames.length > 0) {
+                                        alert(`✅ WhatsApp enviado a: ${successNames.join(', ')}`);
+                                    }
+                                    if (failedNames.length > 0) {
+                                        alert(`⚠️ WhatsApp falló para: ${failedNames.join(', ')}. Revisa que tengan número registrado.`);
+                                    }
                                 }
                             }).catch(err => console.warn('[Notify] Background notification failed:', err));
                         }
@@ -652,7 +677,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                 </button>
                                 <button
                                     onClick={handleSaveTask}
-                                    disabled={isSaving || !formData.title}
+                                    disabled={isSaving || !formData.title?.trim() || (!editingTask && !formData.due_date)}
                                     className="px-6 py-2.5 rounded-xl font-bold bg-[#1a1a1a] text-white hover:bg-black disabled:opacity-50 transition-colors shadow-lg"
                                 >
                                     {isSaving ? 'Guardando...' : 'Guardar Tarea'}

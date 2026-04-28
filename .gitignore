@@ -25,3 +25,12 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# Debug/test scripts
+scratch/
+
+# Tailwind standalone CLI binary
+tailwindcss.exe
+
+# Generated CSS (compiled from tailwind.css by Tailwind CLI)
+index.css

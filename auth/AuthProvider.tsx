@@ -43,10 +43,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+
+            if (event === 'SIGNED_IN' && session?.user) {
+                // Dynamically import propertyService to avoid circular dependency issues if any
+                import('../services/supabase').then(({ propertyService }) => {
+                    propertyService.insertCustomAuditLog('LOGIN', 'auth', session.user.id, {
+                        message: 'Usuario inició sesión',
+                        timestamp: new Date().toISOString()
+                    });
+                });
+            }
         });
 
         return () => subscription.unsubscribe();

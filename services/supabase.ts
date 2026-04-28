@@ -106,22 +106,25 @@ export const propertyService = {
     return data.map(p => mapProperty(p as PropertyDB));
   },
 
-  // Get ALL properties including drafts for admin
-  async getAdminProperties(): Promise<Property[]> {
-    if (!supabase) return [];
+  // Get ALL properties including drafts for admin (with pagination)
+  async getAdminProperties(page: number = 0, pageSize: number = 50): Promise<{ data: Property[]; count: number }> {
+    if (!supabase) return { data: [], count: 0 };
 
-    const { data, error } = await supabase
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await supabase
       .from('properties')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('[ADMIN] Error fetching admin properties:', error);
-      return [];
+      return { data: [], count: 0 };
     }
 
-    console.log(`[ADMIN] getAdminProperties returned ${data?.length} rows. Published: ${data?.filter((p:any) => p.is_published).length}, Drafts: ${data?.filter((p:any) => !p.is_published).length}`);
-    return data.map((p) => mapProperty(p as PropertyDB));
+    return { data: (data || []).map((p: any) => mapProperty(p as PropertyDB)), count: count || 0 };
   },
 
   // Get single property by ID
@@ -439,18 +442,28 @@ export const propertyService = {
     return { success: true };
   },
 
-  // CRM: Get leads
-  async getLeads(): Promise<any[]> {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
-    if (error) return [];
-    return data || [];
+  // CRM: Get leads (with pagination)
+  async getLeads(page: number = 0, pageSize: number = 50): Promise<{ data: any[]; count: number }> {
+    if (!supabase) return { data: [], count: 0 };
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error, count } = await supabase.from('leads').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+    if (error) return { data: [], count: 0 };
+    return { data: data || [], count: count || 0 };
   },
 
   // CRM: Update lead status
   async updateLeadStatus(id: string, status: string): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
     const { error } = await supabase.from('leads').update({ status }).eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  // CRM: Update lead (general)
+  async updateLead(id: string, updates: Partial<Lead>): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('leads').update(updates).eq('id', id);
     if (error) return { success: false, error: error.message };
     return { success: true };
   },
@@ -566,17 +579,38 @@ export const propertyService = {
     }
   },
 
-  // SECURITY: Get Audit Logs
-  async getAuditLogs(): Promise<AuditLog[]> {
-    if (!supabase) return [];
-    // Only superadmin can read this table
-    const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
+  // SECURITY: Get Audit Logs (with pagination)
+  async getAuditLogs(page: number = 0, pageSize: number = 50): Promise<{ data: AuditLog[]; count: number }> {
+    if (!supabase) return { data: [], count: 0 };
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error, count } = await supabase.from('audit_logs').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
     if (error) {
       console.error('Error fetching audit logs:', error);
-      return [];
+      return { data: [], count: 0 };
     }
-    return data || [];
+    return { data: data || [], count: count || 0 };
   },
+
+  // SECURITY: Insert Custom Audit Log (For Frontend Events)
+  async insertCustomAuditLog(action: string, table_name: string, record_id: string | null, new_data: any = null): Promise<void> {
+    if (!supabase) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        user_email: user.email,
+        action,
+        table_name,
+        record_id,
+        new_data
+      });
+    } catch (e) {
+      console.error('Failed to insert custom audit log', e);
+    }
+  },
+
 
   // --- TASKS (JIRA CLONE) ---
 
