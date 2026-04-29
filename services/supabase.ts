@@ -470,6 +470,15 @@ export const propertyService = {
     return { success: true };
   },
 
+  // CRM: Delete lead
+  async deleteLead(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('leads').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+
   // SECURITY: Get the current user's own role via RPC (avoids recursive RLS)
   async getMyRole(): Promise<string> {
     if (!supabase) return 'asesor';

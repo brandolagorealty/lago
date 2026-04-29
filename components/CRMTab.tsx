@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lead, Property, LeadStatus } from '../types';
 import { propertyService } from '../services/supabase';
-import { Search, Layout, List, Phone, Mail, Home, MapPin, MessageSquare, X, Send, Calendar, Plus } from 'lucide-react';
+import { Search, Layout, List, Phone, Mail, Home, MapPin, MessageSquare, X, Send, Calendar, Plus, Trash2 } from 'lucide-react';
 
 interface CRMTabProps {
     leads: Lead[];
@@ -26,6 +26,19 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
         { id: 'closed', title: 'CERRADO/GANADO', color: 'border-emerald-200 bg-emerald-50/50' },
         { id: 'lost', title: 'PERDIDO', color: 'border-red-200 bg-red-50/50' }
     ];
+
+    const handleDeleteLead = async (leadId: string) => {
+        if (!confirm('¿Estás seguro de que deseas eliminar este prospecto? Esta acción no se puede deshacer.')) return;
+        setIsSaving(true);
+        const { success, error } = await propertyService.deleteLead(leadId);
+        setIsSaving(false);
+        if (success) {
+            setSelectedLead(null);
+            onRefresh();
+        } else {
+            alert('Error al eliminar el prospecto: ' + error);
+        }
+    };
 
     const filteredLeads = leads.filter(l => 
         l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -293,9 +306,14 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                         <div className="w-full md:w-1/3 bg-slate-50 border-r border-slate-100 p-6 flex flex-col overflow-y-auto">
                             <div className="flex justify-between items-start mb-6 md:hidden">
                                 <h2 className="text-xl font-bold text-slate-900">Prospecto</h2>
-                                <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleDeleteLead(selectedLead.id)} className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-colors" title="Eliminar Prospecto">
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="w-16 h-16 rounded-full bg-brand-green/10 text-brand-green flex items-center justify-center text-2xl font-bold mb-4 mx-auto md:mx-0 border border-brand-green/20">
@@ -364,9 +382,19 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5 text-brand-green" /> Historial de Interacciones
                                 </h2>
-                                <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => handleDeleteLead(selectedLead.id)} 
+                                        className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-colors"
+                                        title="Eliminar Prospecto"
+                                        disabled={isSaving}
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50 custom-scrollbar space-y-6">
