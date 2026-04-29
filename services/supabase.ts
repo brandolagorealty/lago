@@ -62,6 +62,7 @@ export interface PropertyDB {
   agent_ids?: string[];
   agent_notes?: any; 
   created_at?: string;
+  updated_at?: string;
 }
 
 // Mapper to convert DB property to App property
@@ -84,7 +85,8 @@ const mapProperty = (p: PropertyDB): Property => ({
   status: p.status as PropertyStatus,
   isPublished: p.is_published,
   agentIds: p.agent_ids || [], 
-  agentNotes: p.agent_notes || []
+  agentNotes: p.agent_notes || [],
+  updatedAt: p.updated_at
 });
 
 export const propertyService = {
@@ -681,6 +683,179 @@ export const propertyService = {
       return { success: false, error: "Permiso denegado por seguridad o la tarea no existe." };
     }
     return { success: true };
+  },
+
+  // --- TASK COMMENTS ---
+  
+  async getTaskComments(taskId: string): Promise<import('../types').TaskComment[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('task_comments')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching task comments:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async addTaskComment(taskId: string, text: string): Promise<{ success: boolean; data?: import('../types').TaskComment; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    const { data, error } = await supabase
+      .from('task_comments')
+      .insert([{
+        task_id: taskId,
+        user_id: user.id,
+        user_email: user.email,
+        text: text
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding task comment:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, data };
+  },
+
+  async deleteTaskComment(commentId: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { error } = await supabase
+      .from('task_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (error) {
+      console.error('Error deleting task comment:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  },
+
+  subscribeToTaskComments(taskId: string, callback: (payload: any) => void) {
+    if (!supabase || !taskId) return null;
+
+    const channel = supabase.channel(`task-comments-${taskId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'task_comments',
+          filter: `task_id=eq.${taskId}`
+        },
+        (payload: any) => callback(payload)
+      )
+      .subscribe();
+
+    return channel;
+  },
+
+  // --- NOTIFICATIONS ---
+  
+  // Get latest notifications for current user
+  async getNotifications(limit: number = 50): Promise<import('../types').LagoNotification[]> {
+    if (!supabase) return [];
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+    
+    return data || [];
+  },
+
+  // Mark single notification as read
+  async markNotificationAsRead(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error marking notification as read:', error);
+      return false;
+    }
+    
+    return true;
+  },
+
+  // Mark all user notifications as read
+  async markAllNotificationsAsRead(): Promise<boolean> {
+    if (!supabase) return false;
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+
+    if (error) {
+      console.error('Error marking all notifications as read:', error);
+      return false;
+    }
+    
+    return true;
+  },
+
+  // Create a new notification for a specific user
+  async createNotification(data: Omit<import('../types').LagoNotification, 'id' | 'created_at' | 'is_read'>): Promise<boolean> {
+    if (!supabase) return false;
+    
+    const { error } = await supabase
+      .from('notifications')
+      .insert([data]);
+
+    if (error) {
+      console.error('Error creating notification:', error);
+      return false;
+    }
+    
+    return true;
+  },
+
+  // Subscribe to real-time notification updates
+  subscribeToNotifications(userId: string, callback: (payload: any) => void) {
+    if (!supabase || !userId) return null;
+
+    const channel = supabase.channel(`notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload: any) => callback(payload)
+      )
+      .subscribe();
+
+    return channel;
   }
 };
 

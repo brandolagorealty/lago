@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LagoTask, TaskStatus, Agent } from '../types';
+import { LagoTask, TaskStatus, Agent, TaskComment } from '../types';
 import { propertyService, supabase } from '../services/supabase';
-import { Plus, Search, Layout, List, Calendar, User, Clock, CheckCircle2, MoreHorizontal, X, Trash2 } from 'lucide-react';
+import { Plus, Search, Layout, List, Calendar, User, Clock, CheckCircle2, MoreHorizontal, X, Trash2, MessageSquare, Send } from 'lucide-react';
 
 interface TasksModuleProps {
     currentUserRole: string;
@@ -19,6 +19,11 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
     const [taskToDelete, setTaskToDelete] = useState<LagoTask | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Comments state
+    const [comments, setComments] = useState<TaskComment[]>([]);
+    const [newComment, setNewComment] = useState('');
+    const [isPostingComment, setIsPostingComment] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState<Partial<LagoTask>>({
@@ -54,6 +59,25 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
         };
         loadData();
     }, []);
+
+    useEffect(() => {
+        if (editingTask && isModalOpen) {
+            propertyService.getTaskComments(editingTask.id).then(setComments);
+            const channel = propertyService.subscribeToTaskComments(editingTask.id, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setComments(prev => [...prev, payload.new]);
+                } else if (payload.eventType === 'DELETE') {
+                    setComments(prev => prev.filter(c => c.id !== payload.old.id));
+                }
+            });
+            return () => {
+                if (channel) supabase.removeChannel(channel);
+            };
+        } else {
+            setComments([]);
+            setNewComment('');
+        }
+    }, [editingTask, isModalOpen]);
 
     const columns: { id: TaskStatus; title: string; color: string }[] = [
         { id: 'todo', title: 'POR HACER', color: 'border-slate-200 bg-slate-50' },
@@ -108,6 +132,18 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
             ));
             alert("Error al mover la tarea.");
         } else {
+            // In-app Notification for the creator
+            if (task.assignor_id && task.assignor_id !== currentUserId) {
+                propertyService.createNotification({
+                    user_id: task.assignor_id,
+                    type: 'task_updated',
+                    title: 'Tarea actualizada',
+                    body: `La tarea "${task.title}" cambió a: ${columns.find(c => c.id === newStatus)?.title}`,
+                    link_tab: 'tasks',
+                    link_record_id: task.id
+                }).catch(err => console.warn('Failed to emit in-app notification', err));
+            }
+            
             // Notificar estado nuevo vía WhatsApp
             if (task.assignee_ids && task.assignee_ids.length > 0) {
                 const session = await supabase.auth.getSession();
@@ -124,6 +160,35 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 }
             }
         }
+    };
+
+    // --- Comments Handlers ---
+    const handlePostComment = async () => {
+        if (!editingTask || !newComment.trim()) return;
+        setIsPostingComment(true);
+        const { success, data } = await propertyService.addTaskComment(editingTask.id, newComment.trim());
+        if (success && data) {
+            setNewComment('');
+            
+            // Notify assignees about the comment
+            if (editingTask.assignee_ids && editingTask.assignee_ids.length > 0) {
+                editingTask.assignee_ids.forEach((assigneeId: string) => {
+                    if (assigneeId !== currentUserId) {
+                        propertyService.createNotification({
+                            user_id: assigneeId,
+                            type: 'task_updated',
+                            title: 'Nuevo comentario',
+                            body: `"${editingTask.title}": ${data.text.substring(0, 50)}...`,
+                            link_tab: 'tasks',
+                            link_record_id: editingTask.id
+                        }).catch(err => console.warn('Failed to notify comment', err));
+                    }
+                });
+            }
+        } else {
+            alert('Error al publicar el comentario.');
+        }
+        setIsPostingComment(false);
     };
 
     // --- Form Handlers ---
@@ -185,6 +250,22 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                 if (success && data) {
                     setTasks(prev => [...prev, data]);
                     setIsModalOpen(false);
+
+                    // 🔔 In-App Notifications
+                    if (data.assignee_ids && data.assignee_ids.length > 0) {
+                        data.assignee_ids.forEach((assigneeId: string) => {
+                            if (assigneeId !== currentUserId) {
+                                propertyService.createNotification({
+                                    user_id: assigneeId,
+                                    type: 'task_assigned',
+                                    title: 'Nueva tarea asignada',
+                                    body: data.title,
+                                    link_tab: 'tasks',
+                                    link_record_id: data.id
+                                }).catch(err => console.warn('Failed to emit in-app notification', err));
+                            }
+                        });
+                    }
 
                     // 🔔 Disparar notificación (Google Calendar + WhatsApp) de forma asíncrona
                     if (data.id && data.assignee_ids && data.assignee_ids.length > 0) {
@@ -542,121 +623,197 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
             {/* Task Form Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl overflow-hidden">
-                        <div className="sticky top-0 bg-white/90 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex justify-between items-center z-10">
+                    <div className={`bg-white rounded-3xl w-full ${editingTask ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] flex flex-col shadow-2xl overflow-hidden`}>
+                        <div className="sticky top-0 bg-white/90 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex justify-between items-center z-10 shrink-0">
                             <h2 className="text-xl font-bold text-slate-900">{editingTask ? 'Editar Tarea' : 'Crear Nueva Tarea'}</h2>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                         
-                        <div className="p-6 space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Título de la Tarea</label>
-                                <input
-                                    type="text"
-                                    value={formData.title}
-                                    onChange={e => setFormData({...formData, title: e.target.value})}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
-                                    placeholder="Ej. Tomar fotos de Villa Dorada"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className={`p-6 overflow-y-auto custom-scrollbar flex-1 ${editingTask ? 'grid grid-cols-1 lg:grid-cols-3 gap-8' : ''}`}>
+                            <div className={`${editingTask ? 'lg:col-span-2 space-y-6' : 'space-y-6'}`}>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Asignar a</label>
-                                    <div className="relative border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col">
-                                        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asesores ({formData.assignee_ids?.length || 0})</span>
-                                        </div>
-                                        <div className="max-h-40 overflow-y-auto p-2 space-y-1">
-                                            {agents.map(a => {
-                                                const isSelected = formData.assignee_ids?.includes(a.id);
-                                                return (
-                                                    <label key={a.id} className="flex items-center gap-3 p-2 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="w-4 h-4 rounded border-slate-300 text-brand-green focus:ring-brand-green"
-                                                            checked={isSelected}
-                                                            onChange={(e) => {
-                                                                const checked = e.target.checked;
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    assignee_ids: checked 
-                                                                        ? [...(prev.assignee_ids || []), a.id]
-                                                                        : (prev.assignee_ids || []).filter(id => id !== a.id)
-                                                                }));
-                                                            }}
-                                                        />
-                                                        <div className="flex items-center gap-2">
-                                                            {a.avatar ? (
-                                                                <img src={a.avatar} className="w-5 h-5 rounded-full" />
-                                                            ) : (
-                                                                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">{a.name.charAt(0)}</div>
-                                                            )}
-                                                            <span className="text-sm font-medium text-slate-700">{a.name} <span className="text-slate-400 font-normal">({a.role})</span></span>
-                                                        </div>
-                                                    </label>
-                                                );
-                                            })}
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Título de la Tarea</label>
+                                    <input
+                                        type="text"
+                                        value={formData.title}
+                                        onChange={e => setFormData({...formData, title: e.target.value})}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
+                                        placeholder="Ej. Tomar fotos de Villa Dorada"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Asignar a</label>
+                                        <div className="relative border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col">
+                                            <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asesores ({formData.assignee_ids?.length || 0})</span>
+                                            </div>
+                                            <div className="max-h-40 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                                                {agents.map(a => {
+                                                    const isSelected = formData.assignee_ids?.includes(a.id);
+                                                    return (
+                                                        <label key={a.id} className="flex items-center gap-3 p-2 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="w-4 h-4 rounded border-slate-300 text-brand-green focus:ring-brand-green"
+                                                                checked={isSelected}
+                                                                onChange={(e) => {
+                                                                    const checked = e.target.checked;
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        assignee_ids: checked 
+                                                                            ? [...(prev.assignee_ids || []), a.id]
+                                                                            : (prev.assignee_ids || []).filter(id => id !== a.id)
+                                                                    }));
+                                                                }}
+                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                {a.avatar ? (
+                                                                    <img src={a.avatar} className="w-5 h-5 rounded-full" />
+                                                                ) : (
+                                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">{a.name.charAt(0)}</div>
+                                                                )}
+                                                                <span className="text-sm font-medium text-slate-700">{a.name} <span className="text-slate-400 font-normal">({a.role})</span></span>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Estado</label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={e => setFormData({...formData, status: e.target.value as TaskStatus})}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
+                                        >
+                                            <option value="todo">Por Hacer</option>
+                                            <option value="in_progress">En Curso</option>
+                                            <option value="review">En Revisión</option>
+                                            <option value="done">Finalizado</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Estado</label>
-                                    <select
-                                        value={formData.status}
-                                        onChange={e => setFormData({...formData, status: e.target.value as TaskStatus})}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
-                                    >
-                                        <option value="todo">Por Hacer</option>
-                                        <option value="in_progress">En Curso</option>
-                                        <option value="review">En Revisión</option>
-                                        <option value="done">Finalizado</option>
-                                    </select>
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Fecha Límite (Deadline)</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Fecha Límite (Deadline)</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input
+                                                type="date"
+                                                value={formData.due_date}
+                                                onChange={e => setFormData({...formData, due_date: e.target.value})}
+                                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Enlace Remoto (Opcional)</label>
                                         <input
-                                            type="date"
-                                            value={formData.due_date}
-                                            onChange={e => setFormData({...formData, due_date: e.target.value})}
-                                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
+                                            type="url"
+                                            value={formData.link}
+                                            onChange={e => setFormData({...formData, link: e.target.value})}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
+                                            placeholder="https://..."
                                         />
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Enlace Remoto (Opcional)</label>
-                                    <input
-                                        type="url"
-                                        value={formData.link}
-                                        onChange={e => setFormData({...formData, link: e.target.value})}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
-                                        placeholder="https://..."
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Descripción</label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={e => setFormData({...formData, description: e.target.value})}
+                                        rows={4}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all resize-none"
+                                        placeholder="Detalles sobre lo que hay que hacer..."
                                     />
                                 </div>
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Descripción</label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={e => setFormData({...formData, description: e.target.value})}
-                                    rows={4}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all resize-none"
-                                    placeholder="Detalles sobre lo que hay que hacer..."
-                                />
-                            </div>
+                            
+                            {/* Comments/Chat Panel */}
+                            {editingTask && (
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl flex flex-col h-[600px] lg:h-auto overflow-hidden">
+                                    <div className="p-4 border-b border-slate-200 bg-white">
+                                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                            <MessageSquare className="w-4 h-4 text-brand-green" />
+                                            Actividad y Comentarios
+                                        </h3>
+                                    </div>
+                                    
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50">
+                                        {comments.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                                                    <MessageSquare className="w-5 h-5 text-slate-300" />
+                                                </div>
+                                                <p className="text-sm font-bold text-slate-600">No hay comentarios aún</p>
+                                                <p className="text-xs text-slate-400 mt-1">Sé el primero en iniciar la conversación.</p>
+                                            </div>
+                                        ) : (
+                                            comments.map(c => {
+                                                const isMe = currentUserId === c.user_id;
+                                                return (
+                                                    <div key={c.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                                        <div className="w-8 h-8 rounded-full bg-brand-green/10 text-brand-green flex items-center justify-center font-bold text-xs shrink-0 border border-brand-green/20" title={c.user_email}>
+                                                            {c.user_email?.charAt(0).toUpperCase() || 'U'}
+                                                        </div>
+                                                        <div className={`flex-1 min-w-0 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                                            <div className={`flex items-center gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                                                <span className="text-xs font-bold text-slate-700 truncate">{c.user_email?.split('@')[0]}</span>
+                                                                <span className="text-[10px] text-slate-400 shrink-0">{new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                            </div>
+                                                            <div className={`text-sm mt-0.5 px-4 py-2.5 shadow-sm break-words whitespace-pre-wrap max-w-[90%] ${
+                                                                isMe 
+                                                                ? 'bg-brand-green text-white rounded-2xl rounded-tr-sm' 
+                                                                : 'bg-white text-slate-700 border border-slate-100 rounded-2xl rounded-tl-sm'
+                                                            }`}>
+                                                                {c.text}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                    
+                                    <div className="p-3 bg-white border-t border-slate-200">
+                                        <div className="flex gap-2">
+                                            <textarea
+                                                value={newComment}
+                                                onChange={e => setNewComment(e.target.value)}
+                                                placeholder="Escribe un comentario..."
+                                                rows={1}
+                                                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green text-sm resize-none custom-scrollbar outline-none min-h-[44px] max-h-[120px]"
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handlePostComment();
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                onClick={handlePostComment}
+                                                disabled={!newComment.trim() || isPostingComment}
+                                                className="self-end p-2.5 bg-[#1a1a1a] text-white rounded-xl hover:bg-black disabled:opacity-50 transition-colors shadow-sm shrink-0"
+                                            >
+                                                <Send className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-2 text-center">Presiona <strong>Enter</strong> para enviar, <strong>Shift + Enter</strong> para salto de línea.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center rounded-b-3xl">
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center rounded-b-3xl shrink-0">
                             {editingTask && (currentUserRole === 'superadmin' || editingTask.assignor_id === currentUserId) ? (
                                 <button
                                     onClick={() => confirmDeleteTask(editingTask)}

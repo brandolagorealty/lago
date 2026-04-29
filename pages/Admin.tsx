@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
+import React, { useState, useEffect, useMemo } from 'react';
+
 import PropertyForm from '../components/PropertyForm';
 import TasksModule from '../components/TasksModule';
 import AppraiserModule from '../components/AppraiserModule';
@@ -13,6 +12,7 @@ import SecurityTab from '../components/SecurityTab';
 import AuditTab from '../components/AuditTab';
 import AgentFormModal from '../components/AgentFormModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import NotificationCenter from '../components/NotificationCenter';
 import { Property, Agent, PropertyStatus, PropertyNote, Lead, LeadStatus, UserRole, AuditLog } from '../types';
 import { propertyService } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -253,34 +253,6 @@ const Admin: React.FC = () => {
         });
     }, [properties, agentFilter, statusFilter, textFilter]);
 
-    const statsByAgent = useMemo(() => {
-        return agents.map(agent => {
-            const agentProps = properties.filter(p => p.agentIds?.includes(agent.id));
-            const totalValue = agentProps.reduce((sum, p) => sum + p.price, 0);
-            const soldCount = agentProps.filter(p => p.status === 'sold' || p.status === 'rented').length;
-            const availableCount = agentProps.filter(p => p.status === 'available').length;
-
-            // Monthly sales simulation (for the chart)
-            const monthlySales = Array.from({ length: 6 }, (_, i) => ({
-                month: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'][i],
-                sales: Math.floor(Math.random() * (agentProps.length + 1))
-            }));
-
-            return {
-                ...agent,
-                totalProps: agentProps.length,
-                totalValue,
-                soldCount,
-                availableCount,
-                monthlySales
-            };
-        });
-    }, [agents, properties]);
-
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
-    };
-
     const StatusBadge = ({ status }: { status: PropertyStatus }) => {
         const colors = {
             available: 'bg-green-100 text-green-700 border-green-200',
@@ -301,26 +273,7 @@ const Admin: React.FC = () => {
         );
     };
 
-    const PerformanceChart = ({ data }: { data: { month: string, sales: number }[] }) => {
-        const maxSales = Math.max(...data.map(d => d.sales), 1);
-        return (
-            <div className="flex items-end justify-between h-24 gap-1 mt-4">
-                {data.map((d, i) => (
-                    <div key={i} className="flex flex-col items-center flex-1 group">
-                        <div
-                            className="w-full bg-brand-green/20 group-hover:bg-brand-green transition-all rounded-t-sm relative"
-                            style={{ height: `${(d.sales / maxSales) * 100}%` }}
-                        >
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                {d.sales} cierres
-                            </div>
-                        </div>
-                        <span className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{d.month}</span>
-                    </div>
-                ))}
-            </div>
-        );
-    };
+
 
     const PropertyDetailModal = ({ property, onClose, onUpdate }: { property: Property, onClose: () => void, onUpdate: (id: string, updates: Partial<Property>) => Promise<void> }) => {
         const [newNote, setNewNote] = useState('');
@@ -578,6 +531,14 @@ const Admin: React.FC = () => {
                             <p className="text-sm font-bold text-[#EFEFEF] truncate">{user?.email?.split('@')[0]}</p>
                             <p className="text-[10px] text-[#88C3D8] uppercase font-bold truncate tracking-widest">{currentUserRole || 'Asesor'}</p>
                         </div>
+                        <NotificationCenter 
+                            direction="up"
+                            align="left"
+                            onNavigate={(tab) => {
+                                setActiveTab(tab as any);
+                                setIsMobileMenuOpen(false);
+                            }} 
+                        />
                         <button onClick={handleLogout} className="p-2 text-[#EFEFEF]/50 hover:text-red-400 hover:bg-white/5 rounded-xl transition-colors shrink-0" title="Cerrar Sesión">
                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         </button>
@@ -595,12 +556,23 @@ const Admin: React.FC = () => {
                         </div>
                         <span className="font-serif font-bold text-slate-900 text-lg">Lago Realty</span>
                     </div>
-                    <button 
-                        onClick={() => setIsMobileMenuOpen(true)}
-                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <div className="mr-1">
+                            <NotificationCenter 
+                                direction="down"
+                                onNavigate={(tab) => {
+                                    setActiveTab(tab as any);
+                                    setIsMobileMenuOpen(false);
+                                }} 
+                            />
+                        </div>
+                        <button 
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8 md:px-10">

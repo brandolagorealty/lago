@@ -49,6 +49,7 @@ export interface Property {
   isPublished: boolean;
   agentIds?: string[];
   agentNotes?: PropertyNote[];
+  updatedAt?: string;
 }
 
 export interface FilterState {
@@ -110,3 +111,27 @@ export interface LagoTask {
   created_at: string;
   updated_at: string;
 }
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  user_email: string;
+  text: string;
+  created_at: string;
+}
+
+export type NotificationType = 'task_assigned' | 'task_updated' | 'new_lead' | 'property_status' | 'system';
+
+export interface LagoNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  link_tab?: string;
+  link_record_id?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
