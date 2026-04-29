@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lead, Property, LeadStatus } from '../types';
 import { propertyService } from '../services/supabase';
-import { Search, Layout, List, Phone, Mail, Home, MapPin, MessageSquare, X, Send, Calendar, Plus, Trash2 } from 'lucide-react';
+import { Search, Layout, List, Phone, Mail, Home, MapPin, MessageSquare, X, Send, Calendar, Plus, Trash2, Pencil } from 'lucide-react';
 
 interface CRMTabProps {
     leads: Lead[];
@@ -17,6 +17,9 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
     const [newNote, setNewNote] = useState('');
     const [isCreatingLead, setIsCreatingLead] = useState(false);
     const [newLeadForm, setNewLeadForm] = useState({ name: '', email: '', phone: '', message: '' });
+
+    const [isEditingLead, setIsEditingLead] = useState(false);
+    const [editLeadForm, setEditLeadForm] = useState({ name: '', email: '', phone: '' });
 
     const columns: { id: LeadStatus; title: string; color: string }[] = [
         { id: 'new', title: 'NUEVO', color: 'border-slate-200 bg-slate-50' },
@@ -37,6 +40,36 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
             onRefresh();
         } else {
             alert('Error al eliminar el prospecto: ' + error);
+        }
+    };
+
+    const startEditingLead = () => {
+        if (selectedLead) {
+            setEditLeadForm({
+                name: selectedLead.name || '',
+                email: selectedLead.email || '',
+                phone: selectedLead.phone || ''
+            });
+            setIsEditingLead(true);
+        }
+    };
+
+    const handleEditSave = async () => {
+        if (!selectedLead || !editLeadForm.name) return;
+        setIsSaving(true);
+        const { success, error } = await propertyService.updateLead(selectedLead.id, {
+            name: editLeadForm.name,
+            email: editLeadForm.email,
+            phone: editLeadForm.phone
+        });
+        setIsSaving(false);
+        if (success) {
+            setIsEditingLead(false);
+            // Update the selectedLead locally to reflect changes immediately
+            setSelectedLead({ ...selectedLead, ...editLeadForm });
+            onRefresh();
+        } else {
+            alert('Error al actualizar el prospecto: ' + error);
         }
     };
 
@@ -307,10 +340,13 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                             <div className="flex justify-between items-start mb-6 md:hidden">
                                 <h2 className="text-xl font-bold text-slate-900">Prospecto</h2>
                                 <div className="flex gap-2">
+                                    <button onClick={startEditingLead} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors" title="Editar Prospecto">
+                                        <Pencil className="w-5 h-5" />
+                                    </button>
                                     <button onClick={() => handleDeleteLead(selectedLead.id)} className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-colors" title="Eliminar Prospecto">
                                         <Trash2 className="w-5 h-5" />
                                     </button>
-                                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
+                                    <button onClick={() => { setSelectedLead(null); setIsEditingLead(false); }} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -320,60 +356,110 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                                 {selectedLead.name.charAt(0).toUpperCase()}
                             </div>
                             
-                            <h2 className="text-2xl font-bold text-slate-900 mb-1 text-center md:text-left">{selectedLead.name}</h2>
-                            <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-slate-500 mb-6">
-                                <Calendar className="w-4 h-4" /> Registrado el {new Date(selectedLead.created_at).toLocaleDateString()}
-                            </div>
-
-                            <div className="space-y-4 flex-1">
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Contacto</h3>
-                                    <div className="space-y-3">
-                                        <a href={`mailto:${selectedLead.email}`} className="flex items-center gap-3 text-sm text-slate-700 hover:text-brand-green transition-colors">
-                                            <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100"><Mail className="w-4 h-4" /></div>
-                                            <span className="truncate">{selectedLead.email}</span>
-                                        </a>
-                                        {selectedLead.phone && (
-                                            <a href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-700 hover:text-[#25D366] transition-colors group">
-                                                <div className="w-8 h-8 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center border border-[#25D366]/20 group-hover:bg-[#25D366] group-hover:text-white transition-colors"><Phone className="w-4 h-4" /></div>
-                                                <span>{selectedLead.phone}</span>
-                                            </a>
-                                        )}
+                            {isEditingLead ? (
+                                <div className="space-y-4 mb-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Nombre</label>
+                                        <input 
+                                            type="text" 
+                                            value={editLeadForm.name} 
+                                            onChange={e => setEditLeadForm({...editLeadForm, name: e.target.value})}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-green/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Email</label>
+                                        <input 
+                                            type="email" 
+                                            value={editLeadForm.email} 
+                                            onChange={e => setEditLeadForm({...editLeadForm, email: e.target.value})}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-green/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Teléfono</label>
+                                        <input 
+                                            type="text" 
+                                            value={editLeadForm.phone} 
+                                            onChange={e => setEditLeadForm({...editLeadForm, phone: e.target.value})}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-green/20 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button 
+                                            onClick={handleEditSave}
+                                            disabled={isSaving}
+                                            className="flex-1 bg-brand-green text-white text-sm font-bold py-2 rounded-xl hover:bg-[#1a5b48] transition-colors"
+                                        >
+                                            {isSaving ? 'Guardando...' : 'Guardar'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setIsEditingLead(false)}
+                                            disabled={isSaving}
+                                            className="flex-1 bg-slate-200 text-slate-600 text-sm font-bold py-2 rounded-xl hover:bg-slate-300 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
                                     </div>
                                 </div>
+                            ) : (
+                                <>
+                                    <h2 className="text-2xl font-bold text-slate-900 mb-1 text-center md:text-left">{selectedLead.name}</h2>
+                                    <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-slate-500 mb-6">
+                                        <Calendar className="w-4 h-4" /> Registrado el {new Date(selectedLead.created_at).toLocaleDateString()}
+                                    </div>
 
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Interés / Mensaje</h3>
-                                    {selectedLead.property_id && getProperty(selectedLead.property_id) ? (
-                                        <div className="mb-4">
-                                            <div className="text-xs font-bold text-brand-green bg-brand-green/10 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-2 mb-2">
-                                                <Home className="w-4 h-4" /> {getProperty(selectedLead.property_id)?.title}
+                                    <div className="space-y-4 flex-1">
+                                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Contacto</h3>
+                                            <div className="space-y-3">
+                                                <a href={`mailto:${selectedLead.email}`} className="flex items-center gap-3 text-sm text-slate-700 hover:text-brand-green transition-colors">
+                                                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100"><Mail className="w-4 h-4" /></div>
+                                                    <span className="truncate">{selectedLead.email}</span>
+                                                </a>
+                                                {selectedLead.phone && (
+                                                    <a href={`https://wa.me/${selectedLead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-700 hover:text-[#25D366] transition-colors group">
+                                                        <div className="w-8 h-8 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center border border-[#25D366]/20 group-hover:bg-[#25D366] group-hover:text-white transition-colors"><Phone className="w-4 h-4" /></div>
+                                                        <span>{selectedLead.phone}</span>
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
-                                    ) : null}
-                                    <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg italic">
-                                        "{selectedLead.message}"
-                                    </p>
-                                </div>
-                                
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Estado del Embudo</h3>
-                                    <select
-                                        value={selectedLead.status}
-                                        onChange={async (e) => {
-                                            const newStat = e.target.value as LeadStatus;
-                                            setSelectedLead({ ...selectedLead, status: newStat });
-                                            await propertyService.updateLeadStatus(selectedLead.id, newStat);
-                                            onRefresh();
-                                        }}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-brand-green/20 outline-none transition-all"
-                                    >
-                                        {columns.map(c => (
-                                            <option key={c.id} value={c.id}>{c.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
+
+                                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Interés / Mensaje</h3>
+                                            {selectedLead.property_id && getProperty(selectedLead.property_id) ? (
+                                                <div className="mb-4">
+                                                    <div className="text-xs font-bold text-brand-green bg-brand-green/10 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-2 mb-2">
+                                                        <Home className="w-4 h-4" /> {getProperty(selectedLead.property_id)?.title}
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg italic">
+                                                "{selectedLead.message}"
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Estado del Embudo</h3>
+                                            <select
+                                                value={selectedLead.status}
+                                                onChange={async (e) => {
+                                                    const newStat = e.target.value as LeadStatus;
+                                                    setSelectedLead({ ...selectedLead, status: newStat });
+                                                    await propertyService.updateLeadStatus(selectedLead.id, newStat);
+                                                    onRefresh();
+                                                }}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-brand-green/20 outline-none transition-all"
+                                            >
+                                                {columns.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.title}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Right Column: Interaction History */}
@@ -384,6 +470,14 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                                 </h2>
                                 <div className="flex items-center gap-2">
                                     <button 
+                                        onClick={startEditingLead} 
+                                        className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                                        title="Editar Prospecto"
+                                        disabled={isSaving}
+                                    >
+                                        <Pencil className="w-5 h-5" />
+                                    </button>
+                                    <button 
                                         onClick={() => handleDeleteLead(selectedLead.id)} 
                                         className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-colors"
                                         title="Eliminar Prospecto"
@@ -391,7 +485,7 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                                     >
                                         <Trash2 className="w-5 h-5" />
                                     </button>
-                                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                                    <button onClick={() => { setSelectedLead(null); setIsEditingLead(false); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
