@@ -441,11 +441,14 @@ const Admin: React.FC = () => {
                         setSelectedProperty(null);
                     }}
                 >
-                    <img src="/assets/logo.png" alt="Lago Hub" className="h-8 w-auto object-contain brightness-0 invert" />
-                    <span className="text-lg font-bold text-[#EFEFEF] uppercase tracking-tighter">Lago Hub</span>
+                    <img 
+                        src="https://scdztnzkzrvjgyefunkw.supabase.co/storage/v1/object/public/assets/logos/LAGO%20BLANCO-01.png" 
+                        alt="Lago Realty" 
+                        className="h-10 w-auto object-contain" 
+                    />
                 </div>
                 
-                <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
+                <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 hide-scrollbar">
                     <p className="px-4 text-[10px] font-bold text-[#EFEFEF]/40 uppercase tracking-widest mb-2 mt-2">Gestión</p>
                     <button
                         onClick={() => setActiveTab('dashboard')}
@@ -660,13 +663,12 @@ const Admin: React.FC = () => {
                 {activeTab === 'auditoria' && currentUserRole === 'superadmin' && (
                     <AuditTab auditLogs={auditLogs} />
                 )}
-                {/* Modulo de Tareas / Lago Hub */}
+                {/* Modulo de Tareas / Lago Realty */}
                 {activeTab === 'tasks' && (
                     <div className="flex-1 animate-in fade-in space-y-4">
                         <div className="flex justify-between items-center mb-4">
                             <div>
-                                <h1 className="text-3xl font-black text-slate-800 tracking-tight">Lago Hub</h1>
-                                <p className="text-slate-500 font-medium">Gestor de Tareas y Actividades Corporativas</p>
+                                <h1 className="text-3xl font-black text-slate-800 tracking-tight">Gestor de Tareas y Actividades Corporativas</h1>
                             </div>
                         </div>
                         <TasksModule currentUserRole={currentUserRole} />

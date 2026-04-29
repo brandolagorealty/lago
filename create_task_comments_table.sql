@@ -1,5 +1,5 @@
 -- =====================================================
--- TASK COMMENTS TABLE — Lago Hub Trello Chat History
+-- TASK COMMENTS TABLE — Lago Realty Trello Chat History
 -- Run this in Supabase SQL Editor
 -- =====================================================
 

@@ -141,7 +141,7 @@ exports.handler = async (event) => {
       endDate.setHours(endDate.getHours() + 1);
 
       const calendarEvent = {
-        summary: `📋 Tarea Lago Hub: ${task.title}`,
+        summary: `📋 Tarea Lago Realty: ${task.title}`,
         description: `Asignado a: ${agent.name} (${agent.email})\\n\\n${task.description || ''}\\n\\n🔗 Gestionar tarea: ${taskLink}`,
         start: { dateTime: startDate.toISOString(), timeZone: 'America/Caracas' },
         end: { dateTime: endDate.toISOString(), timeZone: 'America/Caracas' },

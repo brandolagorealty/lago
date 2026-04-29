@@ -1,4 +1,4 @@
--- Crear la tabla de tareas (Jira clone / Lago Hub)
+-- Crear la tabla de tareas (Jira clone / Lago Realty)
 CREATE TABLE IF NOT EXISTS public.tasks (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     title TEXT NOT NULL,

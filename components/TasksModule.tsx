@@ -631,7 +631,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                             </button>
                         </div>
                         
-                        <div className={`p-6 overflow-y-auto custom-scrollbar flex-1 ${editingTask ? 'grid grid-cols-1 lg:grid-cols-3 gap-8' : ''}`}>
+                        <div className={`p-6 overflow-y-auto hide-scrollbar flex-1 ${editingTask ? 'grid grid-cols-1 lg:grid-cols-3 gap-8' : ''}`}>
                             <div className={`${editingTask ? 'lg:col-span-2 space-y-6' : 'space-y-6'}`}>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1.5">Título de la Tarea</label>
@@ -651,7 +651,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                             <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
                                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asesores ({formData.assignee_ids?.length || 0})</span>
                                             </div>
-                                            <div className="max-h-40 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                                            <div className="max-h-40 overflow-y-auto p-2 space-y-1 hide-scrollbar">
                                                 {agents.map(a => {
                                                     const isSelected = formData.assignee_ids?.includes(a.id);
                                                     return (
@@ -748,7 +748,7 @@ export default function TasksModule({ currentUserRole }: TasksModuleProps) {
                                         </h3>
                                     </div>
                                     
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/50">
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 hide-scrollbar bg-slate-50/50">
                                         {comments.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center h-full text-center px-4">
                                                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">

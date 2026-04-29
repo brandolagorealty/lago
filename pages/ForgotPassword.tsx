@@ -41,7 +41,7 @@ const ForgotPassword = () => {
             {/* Logo */}
             <div className="mb-10 flex justify-center">
                 <img 
-                    src="https://scdztnzkzrvjgyefunkw.supabase.co/storage/v1/object/public/assets/MANUAL%20DE%20IDENTIDAD%20LAGO%20READY-09.jpg" 
+                    src="https://scdztnzkzrvjgyefunkw.supabase.co/storage/v1/object/public/assets/logos/LAGO%20AZUL-01.png" 
                     alt="Lago Realty Logo" 
                     className="h-20 w-auto object-contain"
                 />
@@ -50,7 +50,7 @@ const ForgotPassword = () => {
             <div className="bg-white rounded-3xl p-10 shadow-xl shadow-slate-200/50 w-full max-w-md border border-slate-100">
                 <h1 className="text-2xl font-serif font-bold text-slate-900 mb-2">Recuperar Contraseña</h1>
                 <p className="text-slate-500 mb-8 text-sm">
-                    Ingresa el correo electrónico asociado a tu cuenta de Lago Hub. Si está registrado, recibirás un enlace de acceso temporal.
+                    Ingresa el correo electrónico asociado a tu cuenta de Lago Realty. Si está registrado, recibirás un enlace de acceso temporal.
                 </p>
 
                 {error && (

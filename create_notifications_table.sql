@@ -1,5 +1,5 @@
 -- =====================================================
--- NOTIFICATIONS TABLE — Lago Hub In-App Notifications
+-- NOTIFICATIONS TABLE — Lago Realty In-App Notifications
 -- Run this in Supabase SQL Editor
 -- =====================================================
 
