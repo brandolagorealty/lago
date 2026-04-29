@@ -46,7 +46,6 @@ const Admin: React.FC = () => {
     const [agentFilter, setAgentFilter] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<PropertyStatus | 'all'>('all');
     const [textFilter, setTextFilter] = useState('');
-    const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
     const [editingProperty, setEditingProperty] = useState<Property | null>(null);
     const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -627,7 +626,7 @@ const Admin: React.FC = () => {
                         onClearAgentFilter={() => setAgentFilter(null)}
                         onShowForm={() => setShowForm(true)}
                         onEditProperty={setEditingProperty}
-                        onSelectProperty={setSelectedProperty}
+                        onSelectProperty={setEditingProperty}
                         onDeleteProperty={setPropertyToDelete}
                         onPropertiesChange={setProperties}
                         setToast={setToast}
@@ -702,13 +701,7 @@ const Admin: React.FC = () => {
                 />
             )}
 
-            {selectedProperty && (
-                <PropertyDetailModal
-                    property={selectedProperty}
-                    onClose={() => setSelectedProperty(null)}
-                    onUpdate={handleUpdateProperty}
-                />
-            )}
+
 
             {/* Toast Notification */}
             {toast && (
