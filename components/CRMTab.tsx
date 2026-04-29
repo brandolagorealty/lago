@@ -6,10 +6,11 @@ import { Search, Layout, List, Phone, Mail, Home, MapPin, MessageSquare, X, Send
 interface CRMTabProps {
     leads: Lead[];
     properties: Property[];
+    userRoles: any[];
     onRefresh: () => void;
 }
 
-export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
+export default function CRMTab({ leads, properties, userRoles, onRefresh }: CRMTabProps) {
     const [view, setView] = useState<'board' | 'list'>('board');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -19,7 +20,7 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
     const [newLeadForm, setNewLeadForm] = useState({ name: '', email: '', phone: '', message: '' });
 
     const [isEditingLead, setIsEditingLead] = useState(false);
-    const [editLeadForm, setEditLeadForm] = useState({ name: '', email: '', phone: '' });
+    const [editLeadForm, setEditLeadForm] = useState<{name: string, email: string, phone: string, shared_with: string[]}>({ name: '', email: '', phone: '', shared_with: [] });
 
     const columns: { id: LeadStatus; title: string; color: string }[] = [
         { id: 'new', title: 'NUEVO', color: 'border-slate-200 bg-slate-50' },
@@ -48,7 +49,8 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
             setEditLeadForm({
                 name: selectedLead.name || '',
                 email: selectedLead.email || '',
-                phone: selectedLead.phone || ''
+                phone: selectedLead.phone || '',
+                shared_with: selectedLead.shared_with || []
             });
             setIsEditingLead(true);
         }
@@ -60,7 +62,8 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
         const { success, error } = await propertyService.updateLead(selectedLead.id, {
             name: editLeadForm.name,
             email: editLeadForm.email,
-            phone: editLeadForm.phone
+            phone: editLeadForm.phone,
+            shared_with: editLeadForm.shared_with
         });
         setIsSaving(false);
         if (success) {
@@ -384,6 +387,33 @@ export default function CRMTab({ leads, properties, onRefresh }: CRMTabProps) {
                                             onChange={e => setEditLeadForm({...editLeadForm, phone: e.target.value})}
                                             className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-green/20 outline-none"
                                         />
+                                    </div>
+                                    <div className="pt-2 border-t border-slate-100">
+                                        <label className="text-xs font-bold text-slate-400 uppercase block mb-3">Compartir con otros usuarios:</label>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                                            {userRoles && userRoles.length > 0 ? userRoles.map((role: any) => (
+                                                <label key={role.user_id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50 p-2 rounded-lg">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 text-brand-green rounded border-slate-300 focus:ring-brand-green"
+                                                        checked={editLeadForm.shared_with.includes(role.user_id)}
+                                                        onChange={(e) => {
+                                                            const isChecked = e.target.checked;
+                                                            setEditLeadForm(prev => ({
+                                                                ...prev,
+                                                                shared_with: isChecked 
+                                                                    ? [...prev.shared_with, role.user_id] 
+                                                                    : prev.shared_with.filter(id => id !== role.user_id)
+                                                            }));
+                                                        }}
+                                                    />
+                                                    <span className="truncate">{role.email}</span>
+                                                    {role.role === 'superadmin' && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full ml-auto">Admin</span>}
+                                                </label>
+                                            )) : (
+                                                <p className="text-xs text-slate-400 italic">No hay otros usuarios disponibles.</p>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex gap-2 pt-2">
                                         <button 

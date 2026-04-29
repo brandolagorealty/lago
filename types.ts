@@ -70,6 +70,8 @@ export interface Lead {
   message: string;
   property_id?: string;
   agent_id?: string;
+  created_by?: string; // ID del usuario que creó el prospecto
+  shared_with?: string[]; // IDs de usuarios con acceso a ver el prospecto
   status: LeadStatus;
   notes?: any[]; // Reusing the JSON structure similar to agentNotes
   created_at: string;

@@ -439,6 +439,14 @@ export const propertyService = {
   // CRM: Create lead
   async createLead(leadData: any): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    
+    // Inject the current user ID as created_by if available
+    const sessionResult = await supabase.auth.getSession();
+    const userId = sessionResult?.data?.session?.user?.id;
+    if (userId) {
+        leadData.created_by = userId;
+    }
+
     const { error } = await supabase.from('leads').insert([leadData]);
     if (error) return { success: false, error: error.message };
     return { success: true };

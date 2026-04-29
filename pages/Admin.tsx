@@ -84,22 +84,20 @@ const Admin: React.FC = () => {
             setCurrentUserRole(myRole as 'superadmin' | 'asesor');
 
             // Fetch common data for all users (page 0, large page size to get all for now)
-            const [propsResult, agentsData, leadsResult] = await Promise.all([
+            const [propsResult, agentsData, leadsResult, rolesData] = await Promise.all([
                 propertyService.getAdminProperties(0, 200),
                 propertyService.getAgents(),
                 propertyService.getLeads(0, 200),
+                propertyService.getUserRoles()
             ]);
             setProperties(propsResult.data);
             setAgents(agentsData);
             setLeads(leadsResult.data);
+            setUserRoles(rolesData);
 
             // Only fetch sensitive security data for superadmins
             if (myRole === 'superadmin') {
-                const [rolesData, logsResult] = await Promise.all([
-                    propertyService.getUserRoles(),
-                    propertyService.getAuditLogs(0, 200)
-                ]);
-                setUserRoles(rolesData);
+                const logsResult = await propertyService.getAuditLogs(0, 200);
                 setAuditLogs(logsResult.data);
             }
         } catch (error) {
@@ -613,7 +611,7 @@ const Admin: React.FC = () => {
                 )}
 
                 {activeTab === 'crm' && (
-                    <CRMTab leads={leads} properties={properties} onRefresh={fetchData} />
+                    <CRMTab leads={leads} properties={properties} userRoles={userRoles} onRefresh={fetchData} />
                 )}
 
                 {activeTab === 'inventory' && (
