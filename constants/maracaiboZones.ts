@@ -1,13 +1,13 @@
-// Pre-defined polygon coordinates for Maracaibo sectors
-// Each sector has approximate boundary vertices for map rendering
+// Coordenadas calibradas de sectores de Maracaibo y San Francisco
+// Referencia: Av. 5 de Julio como eje, El Lago al Este
 export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: number }[]; meta_km: number; color: string }[] = [
   {
     nombre: 'La Lago',
     color: '#10b981',
     meta_km: 20,
     poligono: [
-      { lat: 10.6810, lng: -71.6230 }, { lat: 10.6810, lng: -71.6100 },
-      { lat: 10.6710, lng: -71.6100 }, { lat: 10.6710, lng: -71.6230 }
+      { lat: 10.6920, lng: -71.6400 }, { lat: 10.6920, lng: -71.6250 },
+      { lat: 10.6820, lng: -71.6250 }, { lat: 10.6820, lng: -71.6400 }
     ]
   },
   {
@@ -15,8 +15,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#f59e0b',
     meta_km: 18,
     poligono: [
-      { lat: 10.6710, lng: -71.6230 }, { lat: 10.6710, lng: -71.6100 },
-      { lat: 10.6620, lng: -71.6100 }, { lat: 10.6620, lng: -71.6230 }
+      { lat: 10.6820, lng: -71.6400 }, { lat: 10.6820, lng: -71.6250 },
+      { lat: 10.6720, lng: -71.6250 }, { lat: 10.6720, lng: -71.6400 }
     ]
   },
   {
@@ -24,8 +24,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#8b5cf6',
     meta_km: 25,
     poligono: [
-      { lat: 10.6700, lng: -71.6100 }, { lat: 10.6700, lng: -71.5960 },
-      { lat: 10.6580, lng: -71.5960 }, { lat: 10.6580, lng: -71.6100 }
+      { lat: 10.6780, lng: -71.6250 }, { lat: 10.6780, lng: -71.6100 },
+      { lat: 10.6650, lng: -71.6100 }, { lat: 10.6650, lng: -71.6250 }
     ]
   },
   {
@@ -33,8 +33,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#06b6d4',
     meta_km: 22,
     poligono: [
-      { lat: 10.6810, lng: -71.6100 }, { lat: 10.6810, lng: -71.5960 },
-      { lat: 10.6700, lng: -71.5960 }, { lat: 10.6700, lng: -71.6100 }
+      { lat: 10.6880, lng: -71.6250 }, { lat: 10.6880, lng: -71.6100 },
+      { lat: 10.6780, lng: -71.6100 }, { lat: 10.6780, lng: -71.6250 }
     ]
   },
   {
@@ -42,8 +42,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#ec4899',
     meta_km: 15,
     poligono: [
-      { lat: 10.6900, lng: -71.6200 }, { lat: 10.6900, lng: -71.6070 },
-      { lat: 10.6810, lng: -71.6070 }, { lat: 10.6810, lng: -71.6200 }
+      { lat: 10.7000, lng: -71.6320 }, { lat: 10.7000, lng: -71.6180 },
+      { lat: 10.6920, lng: -71.6180 }, { lat: 10.6920, lng: -71.6320 }
     ]
   },
   {
@@ -51,8 +51,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#f97316',
     meta_km: 18,
     poligono: [
-      { lat: 10.6950, lng: -71.6350 }, { lat: 10.6950, lng: -71.6200 },
-      { lat: 10.6850, lng: -71.6200 }, { lat: 10.6850, lng: -71.6350 }
+      { lat: 10.7080, lng: -71.6480 }, { lat: 10.7080, lng: -71.6320 },
+      { lat: 10.6940, lng: -71.6320 }, { lat: 10.6940, lng: -71.6480 }
     ]
   },
   {
@@ -60,8 +60,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#14b8a6',
     meta_km: 20,
     poligono: [
-      { lat: 10.6620, lng: -71.6230 }, { lat: 10.6620, lng: -71.6100 },
-      { lat: 10.6520, lng: -71.6100 }, { lat: 10.6520, lng: -71.6230 }
+      { lat: 10.6650, lng: -71.6320 }, { lat: 10.6650, lng: -71.6180 },
+      { lat: 10.6550, lng: -71.6180 }, { lat: 10.6550, lng: -71.6320 }
     ]
   },
   {
@@ -69,8 +69,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#a855f7',
     meta_km: 22,
     poligono: [
-      { lat: 10.6580, lng: -71.6100 }, { lat: 10.6580, lng: -71.5960 },
-      { lat: 10.6470, lng: -71.5960 }, { lat: 10.6470, lng: -71.6100 }
+      { lat: 10.6560, lng: -71.6180 }, { lat: 10.6560, lng: -71.6020 },
+      { lat: 10.6440, lng: -71.6020 }, { lat: 10.6440, lng: -71.6180 }
     ]
   },
   {
@@ -78,8 +78,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#ef4444',
     meta_km: 20,
     poligono: [
-      { lat: 10.6520, lng: -71.6230 }, { lat: 10.6520, lng: -71.6100 },
-      { lat: 10.6420, lng: -71.6100 }, { lat: 10.6420, lng: -71.6230 }
+      { lat: 10.6550, lng: -71.6380 }, { lat: 10.6550, lng: -71.6220 },
+      { lat: 10.6420, lng: -71.6220 }, { lat: 10.6420, lng: -71.6380 }
     ]
   },
   {
@@ -87,8 +87,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#64748b',
     meta_km: 28,
     poligono: [
-      { lat: 10.6470, lng: -71.6100 }, { lat: 10.6470, lng: -71.5930 },
-      { lat: 10.6350, lng: -71.5930 }, { lat: 10.6350, lng: -71.6100 }
+      { lat: 10.6440, lng: -71.6220 }, { lat: 10.6440, lng: -71.6080 },
+      { lat: 10.6300, lng: -71.6080 }, { lat: 10.6300, lng: -71.6220 }
     ]
   },
   {
@@ -96,8 +96,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#0ea5e9',
     meta_km: 25,
     poligono: [
-      { lat: 10.6420, lng: -71.6230 }, { lat: 10.6420, lng: -71.6050 },
-      { lat: 10.6300, lng: -71.6050 }, { lat: 10.6300, lng: -71.6230 }
+      { lat: 10.6360, lng: -71.6380 }, { lat: 10.6360, lng: -71.6220 },
+      { lat: 10.6200, lng: -71.6220 }, { lat: 10.6200, lng: -71.6380 }
     ]
   },
   {
@@ -105,8 +105,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#d946ef',
     meta_km: 22,
     poligono: [
-      { lat: 10.6620, lng: -71.6350 }, { lat: 10.6620, lng: -71.6230 },
-      { lat: 10.6500, lng: -71.6230 }, { lat: 10.6500, lng: -71.6350 }
+      { lat: 10.6650, lng: -71.6520 }, { lat: 10.6650, lng: -71.6380 },
+      { lat: 10.6500, lng: -71.6380 }, { lat: 10.6500, lng: -71.6520 }
     ]
   },
   {
@@ -114,8 +114,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#84cc16',
     meta_km: 18,
     poligono: [
-      { lat: 10.6750, lng: -71.6350 }, { lat: 10.6750, lng: -71.6230 },
-      { lat: 10.6620, lng: -71.6230 }, { lat: 10.6620, lng: -71.6350 }
+      { lat: 10.6750, lng: -71.6550 }, { lat: 10.6750, lng: -71.6400 },
+      { lat: 10.6620, lng: -71.6400 }, { lat: 10.6620, lng: -71.6550 }
     ]
   },
   {
@@ -123,8 +123,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#eab308',
     meta_km: 25,
     poligono: [
-      { lat: 10.6850, lng: -71.5960 }, { lat: 10.6850, lng: -71.5800 },
-      { lat: 10.6720, lng: -71.5800 }, { lat: 10.6720, lng: -71.5960 }
+      { lat: 10.6920, lng: -71.6100 }, { lat: 10.6920, lng: -71.5900 },
+      { lat: 10.6780, lng: -71.5900 }, { lat: 10.6780, lng: -71.6100 }
     ]
   },
   {
@@ -132,8 +132,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#22d3ee',
     meta_km: 20,
     poligono: [
-      { lat: 10.6350, lng: -71.6100 }, { lat: 10.6350, lng: -71.5930 },
-      { lat: 10.6220, lng: -71.5930 }, { lat: 10.6220, lng: -71.6100 }
+      { lat: 10.6260, lng: -71.6280 }, { lat: 10.6260, lng: -71.6120 },
+      { lat: 10.6100, lng: -71.6120 }, { lat: 10.6100, lng: -71.6280 }
     ]
   },
   {
@@ -141,8 +141,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#fb923c',
     meta_km: 22,
     poligono: [
-      { lat: 10.6720, lng: -71.5960 }, { lat: 10.6720, lng: -71.5800 },
-      { lat: 10.6580, lng: -71.5800 }, { lat: 10.6580, lng: -71.5960 }
+      { lat: 10.6780, lng: -71.6100 }, { lat: 10.6780, lng: -71.5900 },
+      { lat: 10.6650, lng: -71.5900 }, { lat: 10.6650, lng: -71.6100 }
     ]
   },
   {
@@ -150,8 +150,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#4ade80',
     meta_km: 20,
     poligono: [
-      { lat: 10.6900, lng: -71.6070 }, { lat: 10.6900, lng: -71.5960 },
-      { lat: 10.6810, lng: -71.5960 }, { lat: 10.6810, lng: -71.6070 }
+      { lat: 10.7040, lng: -71.6200 }, { lat: 10.7040, lng: -71.6040 },
+      { lat: 10.6920, lng: -71.6040 }, { lat: 10.6920, lng: -71.6200 }
     ]
   },
   {
@@ -159,8 +159,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#c084fc',
     meta_km: 35,
     poligono: [
-      { lat: 10.6300, lng: -71.6350 }, { lat: 10.6300, lng: -71.6100 },
-      { lat: 10.6100, lng: -71.6100 }, { lat: 10.6100, lng: -71.6350 }
+      { lat: 10.6200, lng: -71.6550 }, { lat: 10.6200, lng: -71.6250 },
+      { lat: 10.6000, lng: -71.6250 }, { lat: 10.6000, lng: -71.6550 }
     ]
   },
   {
@@ -168,8 +168,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#fbbf24',
     meta_km: 30,
     poligono: [
-      { lat: 10.6100, lng: -71.6350 }, { lat: 10.6100, lng: -71.6100 },
-      { lat: 10.5900, lng: -71.6100 }, { lat: 10.5900, lng: -71.6350 }
+      { lat: 10.6000, lng: -71.6550 }, { lat: 10.6000, lng: -71.6250 },
+      { lat: 10.5780, lng: -71.6250 }, { lat: 10.5780, lng: -71.6550 }
     ]
   },
   {
@@ -177,8 +177,8 @@ export const MARACAIBO_ZONES: { nombre: string; poligono: { lat: number; lng: nu
     color: '#2dd4bf',
     meta_km: 20,
     poligono: [
-      { lat: 10.6710, lng: -71.6350 }, { lat: 10.6710, lng: -71.6230 },
-      { lat: 10.6620, lng: -71.6230 }, { lat: 10.6620, lng: -71.6350 }
+      { lat: 10.6720, lng: -71.6550 }, { lat: 10.6720, lng: -71.6400 },
+      { lat: 10.6620, lng: -71.6400 }, { lat: 10.6620, lng: -71.6550 }
     ]
   }
 ];

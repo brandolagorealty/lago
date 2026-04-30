@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { propertyService } from '../services/supabase';
 import { Recorrido, Captacion, ZonaFarming, UserRole } from '../types';
 import FarmingZonesPanel from './FarmingZonesPanel';
+import { useAuth } from '../auth/AuthProvider';
 
 // Load Leaflet CSS from CDN
 if (!document.querySelector('link[href*="leaflet"]')) {
@@ -74,6 +75,8 @@ interface FarmingProps {
 
 export default function FarmingModule({ currentUserRole, userRoles }: FarmingProps) {
   const isAdmin = currentUserRole === 'superadmin';
+  const { user } = useAuth();
+  const currentUserId = user?.id;
 
   // Route tracking
   const [isTracking, setIsTracking] = useState(false);
@@ -173,6 +176,9 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     return pct >= 75 ? 0.15 : pct >= 25 ? 0.25 : 0.35;
   };
 
+  // Filter: asesores only see their own zones, superadmin sees all
+  const visibleZonas = isAdmin ? zonas : zonas.filter(z => z.asignado_a === currentUserId);
+
   return (
     <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
@@ -227,7 +233,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
               {showHeatmap && <HeatmapLayer points={heatPoints} />}
 
               {/* Zones as polygons */}
-              {zonas.map(z => z.poligono && z.poligono.length >= 3 && (
+              {visibleZonas.map(z => z.poligono && z.poligono.length >= 3 && (
                 <Polygon key={z.id} positions={z.poligono.map(p => [p.lat, p.lng] as [number,number])}
                   pathOptions={{ color: z.color, fillColor: z.color, fillOpacity: getZoneOpacity(z), weight: selectedZona?.id === z.id ? 3 : 1 }}>
                   <Popup><div className="text-xs"><p className="font-bold">{z.nombre}</p><p>{z.asignado_email || 'Sin asignar'}</p><p>{z.meta_km > 0 ? Math.round((z.km_recorridos/z.meta_km)*100) : 0}% cubierto</p></div></Popup>
@@ -281,7 +287,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
         {/* Zones Panel (right side) */}
         <div className="w-full lg:w-80 shrink-0">
-          <FarmingZonesPanel zonas={zonas} userRoles={userRoles || []} isAdmin={isAdmin}
+          <FarmingZonesPanel zonas={visibleZonas} userRoles={userRoles || []} isAdmin={isAdmin}
             onRefresh={loadData} onSelectZona={setSelectedZona} selectedZona={selectedZona} />
         </div>
       </div>
