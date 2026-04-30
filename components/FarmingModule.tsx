@@ -6,6 +6,7 @@ import { propertyService } from '../services/supabase';
 import { Recorrido, Captacion, ZonaFarming, UserRole } from '../types';
 import FarmingZonesPanel from './FarmingZonesPanel';
 import { useAuth } from '../auth/AuthProvider';
+import { generateMaracaiboGrid, GridCell } from '../constants/maracaiboZones';
 
 // Load Leaflet CSS from CDN
 if (!document.querySelector('link[href*="leaflet"]')) {
@@ -100,6 +101,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [showHistory, setShowHistory] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [selectedZona, setSelectedZona] = useState<ZonaFarming|null>(null);
+  const [pendingGridCell, setPendingGridCell] = useState<GridCell | null>(null);
+  const [assignForm, setAssignForm] = useState({ nombre: '', asignado_a: '', asignado_email: '' });
 
   useEffect(() => { loadData(); }, []);
 
@@ -179,6 +182,19 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   // Filter: asesores only see their own zones, superadmin sees all
   const visibleZonas = isAdmin ? zonas : zonas.filter(z => z.asignado_a === currentUserId);
 
+  // Generate and filter grid cells
+  const baseGrid = React.useMemo(() => generateMaracaiboGrid(), []);
+  const availableGrid = baseGrid.filter(cell => {
+    if (!cell.poligono || cell.poligono.length === 0) return false;
+    return !zonas.some(z => 
+      z.poligono && z.poligono.length > 0 &&
+      Math.abs(z.poligono[0].lat - cell.poligono[0].lat) < 0.001 &&
+      Math.abs(z.poligono[0].lng - cell.poligono[0].lng) < 0.001
+    );
+  });
+
+  const COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#a855f7', '#ef4444', '#64748b', '#0ea5e9'];
+
   return (
     <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
@@ -229,8 +245,22 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             <MapContainer center={MARACAIBO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
               <TileLayer attribution='&copy; OSM' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <RecenterMap position={isTracking ? userPosition : null} />
-
+              
               {showHeatmap && <HeatmapLayer points={heatPoints} />}
+
+              {/* Available Grid Cells */}
+              {isAdmin && availableGrid.map(cell => (
+                <Polygon key={cell.id} positions={cell.poligono.map(p => [p.lat, p.lng] as [number, number])}
+                  pathOptions={{ color: '#cbd5e1', weight: 1, dashArray: '4 4', fillOpacity: 0.05 }}
+                  eventHandlers={{
+                    click: () => {
+                      setPendingGridCell(cell);
+                      setAssignForm({ nombre: '', asignado_a: '', asignado_email: '' });
+                    }
+                  }}>
+                  <Popup><div className="text-xs font-bold text-slate-500">Haz clic para asignar esta zona</div></Popup>
+                </Polygon>
+              ))}
 
               {/* Zones as polygons */}
               {visibleZonas.map(z => z.poligono && z.poligono.length >= 3 && (
@@ -308,6 +338,59 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
               </div>
             ))}</div>
           )}
+        </div>
+      )}
+
+      {/* Grid Assignment Modal */}
+      {pendingGridCell && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Target className="w-5 h-5 text-emerald-600" /> Asignar Zona</h3>
+              <button onClick={() => setPendingGridCell(null)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Nombre de la Zona / Sector</label>
+                <input value={assignForm.nombre} onChange={e => setAssignForm({...assignForm, nombre: e.target.value})} placeholder="Ej: Tierra Negra, Sector 2..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Asesor Asignado</label>
+                <select value={assignForm.asignado_a} onChange={e => {
+                  const u = userRoles.find(r => r.user_id === e.target.value);
+                  setAssignForm({...assignForm, asignado_a: e.target.value, asignado_email: u?.email || ''});
+                }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="">👤 Seleccionar Asesor...</option>
+                  {userRoles.map(r => <option key={r.user_id} value={r.user_id}>{r.email}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-100">
+              <button onClick={() => setPendingGridCell(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-all">Cancelar</button>
+              <button onClick={async () => {
+                if (!assignForm.nombre || !assignForm.asignado_a) return;
+                setIsSaving(true);
+                const color = COLORS[zonas.length % COLORS.length];
+                await propertyService.createZonaFarming({
+                  nombre: assignForm.nombre,
+                  poligono: pendingGridCell.poligono,
+                  color,
+                  meta_km: pendingGridCell.meta_km,
+                  asignado_a: assignForm.asignado_a,
+                  asignado_email: assignForm.asignado_email,
+                  estado: 'pendiente',
+                  km_recorridos: 0
+                });
+                setIsSaving(false);
+                setPendingGridCell(null);
+                loadData();
+              }} disabled={isSaving || !assignForm.nombre || !assignForm.asignado_a} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-600/20">
+                {isSaving ? 'Guardando...' : 'Asignar Zona'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

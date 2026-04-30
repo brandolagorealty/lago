@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Trash2, Target, Plus, ChevronDown } from 'lucide-react';
+import { Trash2, Target, Edit2, Check, X } from 'lucide-react';
 import { propertyService } from '../services/supabase';
 import { ZonaFarming, UserRole } from '../types';
-import { MARACAIBO_ZONES } from '../constants/maracaiboZones';
 
 interface Props {
   zonas: ZonaFarming[];
@@ -14,36 +13,16 @@ interface Props {
 }
 
 export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh, onSelectZona, selectedZona }: Props) {
-  const [showForm, setShowForm] = useState(false);
-  const [selectedSector, setSelectedSector] = useState('');
-  const [selectedAsesor, setSelectedAsesor] = useState('');
+  const [renameZoneId, setRenameZoneId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Filter out sectors already added as zones
-  const usedNames = zonas.map(z => z.nombre);
-  const availableSectors = MARACAIBO_ZONES.filter(z => !usedNames.includes(z.nombre));
-
-  const handleAdd = async () => {
-    if (!selectedSector || !selectedAsesor) return;
-    const sector = MARACAIBO_ZONES.find(z => z.nombre === selectedSector);
-    if (!sector) return;
-    const asesor = userRoles.find(r => r.user_id === selectedAsesor);
-
+  const handleRename = async (id: string) => {
+    if (!renameValue.trim()) return;
     setIsSaving(true);
-    await propertyService.createZonaFarming({
-      nombre: sector.nombre,
-      poligono: sector.poligono,
-      color: sector.color,
-      meta_km: sector.meta_km,
-      asignado_a: selectedAsesor,
-      asignado_email: asesor?.email || '',
-      estado: 'pendiente',
-      km_recorridos: 0
-    });
+    await propertyService.updateZonaFarming(id, { nombre: renameValue });
     setIsSaving(false);
-    setSelectedSector('');
-    setSelectedAsesor('');
-    setShowForm(false);
+    setRenameZoneId(null);
     onRefresh();
   };
 
@@ -64,13 +43,8 @@ export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <Target className="w-5 h-5 text-emerald-600" /> Zonas
+          <Target className="w-5 h-5 text-emerald-600" /> Zonas Asignadas
         </h3>
-        {isAdmin && (
-          <button onClick={() => setShowForm(!showForm)} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-            {showForm ? 'Cancelar' : <><Plus className="w-4 h-4" /> Agregar</>}
-          </button>
-        )}
       </div>
 
       {/* Global progress */}
@@ -84,24 +58,10 @@ export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh
         <p className="text-[10px] text-slate-400 mt-1">{totalRec.toFixed(1)} / {totalMeta.toFixed(1)} km · {zonas.length} zonas</p>
       </div>
 
-      {/* Simple add form: just select sector + asesor */}
-      {showForm && isAdmin && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-3">
-          <p className="text-xs font-bold text-emerald-700 mb-1">Selecciona un sector y asigna un asesor:</p>
-          <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none appearance-none font-medium">
-            <option value="">📍 Seleccionar sector...</option>
-            {availableSectors.map(s => <option key={s.nombre} value={s.nombre}>{s.nombre} (~{s.meta_km} km)</option>)}
-          </select>
-          <select value={selectedAsesor} onChange={e => setSelectedAsesor(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none appearance-none font-medium">
-            <option value="">👤 Asignar a un asesor...</option>
-            {userRoles.map(r => <option key={r.user_id} value={r.user_id}>{r.email}</option>)}
-          </select>
-          <button onClick={handleAdd} disabled={!selectedSector || !selectedAsesor || isSaving}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
-            {isSaving ? 'Guardando...' : '✅ Agregar Zona al Mapa'}
-          </button>
+      {isAdmin && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+          <p className="text-sm font-bold text-emerald-800">¿Quieres agregar una zona?</p>
+          <p className="text-xs text-emerald-600 mt-1">Haz clic en cualquier cuadrante vacío directamente en el mapa.</p>
         </div>
       )}
 
@@ -116,7 +76,18 @@ export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: z.color }} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900 text-sm truncate">{z.nombre}</p>
+                  {renameZoneId === z.id ? (
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <input value={renameValue} onChange={e => setRenameValue(e.target.value)} className="w-full text-sm font-bold text-slate-900 border-b border-emerald-500 outline-none bg-transparent" autoFocus />
+                      <button onClick={() => handleRename(z.id)} disabled={isSaving} className="p-1 text-emerald-600 hover:bg-emerald-100 rounded"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setRenameZoneId(null)} className="p-1 text-slate-400 hover:bg-slate-100 rounded"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-900 text-sm truncate">{z.nombre}</p>
+                      {isAdmin && <button onClick={(e) => { e.stopPropagation(); setRenameValue(z.nombre); setRenameZoneId(z.id); }} className="text-slate-300 hover:text-emerald-600"><Edit2 className="w-3 h-3" /></button>}
+                    </div>
+                  )}
                   <p className="text-[10px] text-slate-500">{z.asignado_email?.split('@')[0] || 'Sin asignar'} · {z.km_recorridos.toFixed(1)}/{z.meta_km} km</p>
                 </div>
                 <span className="text-xs font-bold" style={{ color: pct >= 75 ? '#10b981' : pct >= 25 ? '#f59e0b' : '#ef4444' }}>{pct}%</span>
