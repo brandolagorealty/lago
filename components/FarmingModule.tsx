@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame } from 'lucide-react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { propertyService } from '../services/supabase';
 import { Recorrido, Captacion, ZonaFarming, UserRole } from '../types';
@@ -65,20 +65,7 @@ function HeatmapLayer({ points }: { points: [number, number][] }) {
   return null;
 }
 
-// Drawing handler for polygon creation
-function DrawHandler({ onComplete }: { onComplete: (pts: {lat:number;lng:number}[]) => void }) {
-  const [pts, setPts] = useState<{lat:number;lng:number}[]>([]);
-  useMapEvents({
-    click(e) { setPts(prev => [...prev, { lat: e.latlng.lat, lng: e.latlng.lng }]); },
-    dblclick(e) { 
-      e.originalEvent.preventDefault();
-      if (pts.length >= 3) onComplete([...pts, { lat: e.latlng.lat, lng: e.latlng.lng }]);
-      setPts([]);
-    }
-  });
-  if (pts.length < 2) return null;
-  return <Polyline positions={pts.map(p => [p.lat, p.lng] as [number,number])} pathOptions={{ color: '#10b981', weight: 2, dashArray: '6 4' }} />;
-}
+
 
 interface FarmingProps {
   currentUserRole: 'superadmin' | 'asesor' | null;
@@ -109,9 +96,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [captureForm, setCaptureForm] = useState({ tipo_inmueble: 'Casa', estatus: 'Se Vende', telefono_contacto: '', notas: '' });
   const [showHistory, setShowHistory] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [selectedZona, setSelectedZona] = useState<ZonaFarming|null>(null);
-  const [pendingZonaForm, setPendingZonaForm] = useState<any>(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -174,13 +159,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     await propertyService.deleteRecorrido(id); loadData();
   };
 
-  // Handle polygon drawing complete
-  const handlePolygonComplete = async (pts: {lat:number;lng:number}[]) => {
-    setIsDrawing(false);
-    if (!pendingZonaForm) return;
-    await propertyService.createZonaFarming({ ...pendingZonaForm, poligono: pts, estado: 'pendiente', km_recorridos: 0 });
-    setPendingZonaForm(null); loadData();
-  };
+
 
   // Heatmap points from all recorridos
   const heatPoints: [number,number][] = recorridos.flatMap(r => (r.coordenadas_ruta || []).map((c: any) => [c.lat, c.lng] as [number,number]));
@@ -222,7 +201,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
       {gpsError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm font-medium flex items-center gap-2"><MapPin className="w-5 h-5" /> {gpsError}</div>}
 
-      {isDrawing && <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-2xl text-sm font-bold animate-pulse">✏️ Modo Dibujo: Haz clic en el mapa para marcar los vértices de la zona. Doble clic para terminar.</div>}
+
 
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Map Column */}
@@ -244,7 +223,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             <MapContainer center={MARACAIBO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
               <TileLayer attribution='&copy; OSM' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <RecenterMap position={isTracking ? userPosition : null} />
-              {isDrawing && <DrawHandler onComplete={handlePolygonComplete} />}
+
               {showHeatmap && <HeatmapLayer points={heatPoints} />}
 
               {/* Zones as polygons */}
@@ -302,20 +281,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
         {/* Zones Panel (right side) */}
         <div className="w-full lg:w-80 shrink-0">
-          <FarmingZonesPanel zonas={zonas} recorridos={recorridos} userRoles={userRoles || []} isAdmin={isAdmin}
+          <FarmingZonesPanel zonas={zonas} userRoles={userRoles || []} isAdmin={isAdmin}
             onRefresh={loadData} onSelectZona={setSelectedZona} selectedZona={selectedZona} />
-          {isAdmin && !isDrawing && (
-            <button onClick={() => { setIsDrawing(true); setPendingZonaForm({ nombre: 'Nueva Zona', meta_km: 25, color: '#10b981', asignado_a: '', asignado_email: '' }); }}
-              className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2">
-              ✏️ Dibujar Zona en Mapa
-            </button>
-          )}
-          {isDrawing && (
-            <button onClick={() => { setIsDrawing(false); setPendingZonaForm(null); }}
-              className="w-full mt-3 bg-red-500 hover:bg-red-600 text-white py-3 rounded-2xl font-bold text-sm transition-all">
-              Cancelar Dibujo
-            </button>
-          )}
         </div>
       </div>
 
