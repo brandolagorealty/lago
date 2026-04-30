@@ -20,28 +20,29 @@ export function generateMaracaiboGrid(): GridCell[] {
       startLat: 10.5000,
       endLat: 10.7700,
       startLng: -71.7900,
-      endLng: -71.5800 // Adjusted to avoid deep water
+      endLng: -71.5800 
     },
     {
       name: "Oriente", // Miranda / Cabimas / Lagunillas
       startLat: 10.1500,
       endLat: 10.7500,
-      startLng: -71.5200,
+      startLng: -71.5500, // Expanded west to reach the coast
       endLng: -71.2800
     }
   ];
 
-  // Helper to check if a coordinate is in the lake (rough approximation)
-  // The lake is roughly between -71.58 and -71.52 Lng at Maracaibo's latitude
+  // Helper to check if a coordinate is in the lake (refined)
   const isLikelyWater = (lat: number, lng: number) => {
     // Narrow channel between Maracaibo and Los Puertos
-    if (lat > 10.60 && lat < 10.72 && lng > -71.59 && lng < -71.50) return true;
+    // East coast of channel (Miranda) is around -71.51 to -71.52
+    if (lat > 10.60 && lat < 10.72 && lng > -71.59 && lng < -71.53) return true;
     
-    // Wide lake area south of Maracaibo
-    if (lat > 10.30 && lat <= 10.60 && lng > -71.56 && lng < -71.42) return true;
+    // Wide lake area south of Maracaibo channel
+    // East coast near Santa Rita is around -71.54
+    if (lat > 10.45 && lat <= 10.60 && lng > -71.57 && lng < -71.54) return true;
     
-    // Far south lake area
-    if (lat > 10.10 && lat <= 10.30 && lng > -71.52 && lng < -71.35) return true;
+    // Deeper lake area (center)
+    if (lat > 10.10 && lat <= 10.45 && lng > -71.55 && lng < -71.45) return true;
 
     return false;
   };
