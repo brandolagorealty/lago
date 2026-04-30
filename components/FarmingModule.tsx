@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target } from 'lucide-react';
+import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target, Star, ChevronDown, ChevronRight, ClipboardList, BookOpen, Users } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { propertyService } from '../services/supabase';
-import { Recorrido, Captacion, ZonaFarming, UserRole } from '../types';
+import { Recorrido, Captacion, ZonaFarming, UserRole, ReporteInteligencia, RangoRapido, NivelActividad, NivelReceptividad } from '../types';
 import FarmingZonesPanel from './FarmingZonesPanel';
 import { useAuth } from '../auth/AuthProvider';
 import { generateMaracaiboGrid, GridCell } from '../constants/maracaiboZones';
@@ -105,6 +105,16 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [pendingGridCell, setPendingGridCell] = useState<GridCell | null>(null);
   const [assignForm, setAssignForm] = useState({ municipio: '', parroquia: '', sector: '', asignado_a: '', asignado_email: '' });
 
+  // Intelligence Report state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const defaultReport: ReporteInteligencia = { carteles_duenos: '0', carteles_competencia: '0', inmuebles_abandonados: '0', contactos_clave: '0', tarjetas_entregadas: '0', actividad_construccion: 'Nula', receptividad: 'Indiferente', potencial_captacion: 3, notas: '' };
+  const [reportForm, setReportForm] = useState<ReporteInteligencia>({ ...defaultReport });
+
+  // Bitácora state
+  const [showBitacora, setShowBitacora] = useState(false);
+  const [expandedZones, setExpandedZones] = useState<Record<string, boolean>>({});
+  const [bitacoraFilter, setBitacoraFilter] = useState<string>('all');
+
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
@@ -145,12 +155,21 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setIsTracking(false);
     if (activeRecorridoId && routeCoords.length > 0) {
-      setIsSaving(true);
-      await propertyService.finishRecorrido(activeRecorridoId, routeCoords, currentDistance);
-      setIsSaving(false); setActiveRecorridoId(null); setRouteCoords([]); setZoneName('');
-      loadData();
+      // Open the intelligence report modal instead of saving immediately
+      setReportForm({ ...defaultReport });
+      setShowReportModal(true);
     }
   }, [activeRecorridoId, routeCoords, currentDistance]);
+
+  const submitReport = async () => {
+    if (!activeRecorridoId) return;
+    setIsSaving(true);
+    await propertyService.finishRecorrido(activeRecorridoId, routeCoords, currentDistance, reportForm);
+    setIsSaving(false);
+    setShowReportModal(false);
+    setActiveRecorridoId(null); setRouteCoords([]); setZoneName('');
+    loadData();
+  };
 
   const saveCaptacion = async () => {
     if (!userPosition) { setGpsError('No se pudo obtener ubicación GPS.'); return; }
@@ -313,6 +332,9 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             <button onClick={() => setShowHistory(!showHistory)} className={`p-4 rounded-2xl transition-colors ${showHistory ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Historial">
               <Clock className="w-6 h-6" />
             </button>
+            <button onClick={() => setShowBitacora(!showBitacora)} className={`p-4 rounded-2xl transition-colors ${showBitacora ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Bitácora de Farming">
+              <BookOpen className="w-6 h-6" />
+            </button>
           </div>
         </div>
 
@@ -456,6 +478,177 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
           </div>
         </div>
       )}
+      {/* Intelligence Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-end md:items-center justify-center p-0 md:p-4 overflow-y-auto">
+          <div className="bg-white w-full md:max-w-lg md:rounded-3xl rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10 md:rounded-t-3xl">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-emerald-600" /> Reporte de Inteligencia</h3>
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-medium"><Route className="w-4 h-4" /> {formatDistance(currentDistance)}</div>
+            </div>
+            <div className="p-5 space-y-5">
+              {/* Section 1: Oportunidades */}
+              <div className="space-y-3">
+                <p className="text-xs font-black text-emerald-600 uppercase tracking-wider">🎯 Oportunidades Detectadas</p>
+                {([['carteles_duenos', 'Carteles de Dueños'], ['carteles_competencia', 'Carteles Competencia'], ['inmuebles_abandonados', 'Inmuebles Abandonados/Vacíos']] as const).map(([key, label]) => (
+                  <div key={key}>
+                    <label className="text-xs font-bold text-slate-500 block mb-1.5">{label}</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['0', '1-3', '4-10', '10+'] as RangoRapido[]).map(v => (
+                        <button key={v} onClick={() => setReportForm({...reportForm, [key]: v})} className={`py-2.5 rounded-xl font-bold text-sm transition-all ${reportForm[key] === v ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{v}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Section 2: Siembra */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <p className="text-xs font-black text-blue-600 uppercase tracking-wider">🌱 Trabajo de Siembra</p>
+                {([['contactos_clave', 'Contactos Clave (vigilantes, conserjes)'], ['tarjetas_entregadas', 'Tarjetas/Flyers Entregados']] as const).map(([key, label]) => (
+                  <div key={key}>
+                    <label className="text-xs font-bold text-slate-500 block mb-1.5">{label}</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['0', '1-3', '4-10', '10+'] as RangoRapido[]).map(v => (
+                        <button key={v} onClick={() => setReportForm({...reportForm, [key]: v})} className={`py-2.5 rounded-xl font-bold text-sm transition-all ${reportForm[key] === v ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{v}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Section 3: Termómetro */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <p className="text-xs font-black text-purple-600 uppercase tracking-wider">🌡️ Termómetro de la Zona</p>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1.5">Actividad de Construcción</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Nula', 'Baja', 'Alta'] as NivelActividad[]).map(v => (
+                      <button key={v} onClick={() => setReportForm({...reportForm, actividad_construccion: v})} className={`py-2.5 rounded-xl font-bold text-sm transition-all ${reportForm.actividad_construccion === v ? 'bg-purple-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{v}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1.5">Receptividad de la Gente</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Hostil', 'Indiferente', 'Receptiva'] as NivelReceptividad[]).map(v => (
+                      <button key={v} onClick={() => setReportForm({...reportForm, receptividad: v})} className={`py-2.5 rounded-xl font-bold text-sm transition-all ${reportForm.receptividad === v ? (v === 'Hostil' ? 'bg-red-600 text-white shadow-lg' : v === 'Receptiva' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-amber-500 text-white shadow-lg') : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{v}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1.5">Potencial de Captación</label>
+                  <div className="flex gap-1 justify-center py-1">
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} onClick={() => setReportForm({...reportForm, potencial_captacion: n})} className="p-1 transition-transform hover:scale-110">
+                        <Star className={`w-8 h-8 ${n <= reportForm.potencial_captacion ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Section 4: Notas */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="text-xs font-black text-slate-600 uppercase tracking-wider block mb-2">📝 Observaciones</label>
+                <textarea value={reportForm.notas} onChange={e => setReportForm({...reportForm, notas: e.target.value})} placeholder="Detalles relevantes del recorrido..." rows={3} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none focus:ring-2 focus:ring-emerald-500/20" />
+              </div>
+            </div>
+            <div className="p-5 border-t border-slate-100 sticky bottom-0 bg-white md:rounded-b-3xl">
+              <button onClick={submitReport} disabled={isSaving} className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-4 rounded-2xl font-bold text-lg active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all">
+                {isSaving ? 'Guardando...' : '✅ Guardar Reporte y Finalizar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bitácora Personal */}
+      {showBitacora && (() => {
+        const filteredRecs = isAdmin && bitacoraFilter !== 'all'
+          ? recorridos.filter(r => r.agente_id === bitacoraFilter)
+          : isAdmin ? recorridos : recorridos.filter(r => r.agente_id === currentUserId);
+
+        const grouped = filteredRecs.reduce<Record<string, Recorrido[]>>((acc, r) => {
+          const key = r.zona_nombre || 'Sin nombre';
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(r);
+          return acc;
+        }, {});
+
+        const uniqueAgents = Array.from(new Set(recorridos.map(r => r.agente_id).filter(Boolean)));
+
+        return (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><BookOpen className="w-5 h-5 text-amber-500" /> Mi Bitácora de Farming</h3>
+              {isAdmin && (
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-slate-400" />
+                  <select value={bitacoraFilter} onChange={e => setBitacoraFilter(e.target.value)} className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
+                    <option value="all">Todos los asesores</option>
+                    {uniqueAgents.map(id => {
+                      const email = recorridos.find(r => r.agente_id === id)?.agente_email || id;
+                      return <option key={id} value={id!}>{email?.split('@')[0]}</option>;
+                    })}
+                  </select>
+                </div>
+              )}
+            </div>
+            {Object.keys(grouped).length === 0 ? (
+              <p className="text-sm text-slate-400 italic text-center py-6">Sin recorridos registrados.</p>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(grouped).map(([zona, recs]) => {
+                  const totalKm = recs.reduce((s, r) => s + (r.distancia_metros || 0), 0);
+                  const recsWithReport = recs.filter(r => r.reporte);
+                  const avgPotencial = recsWithReport.length > 0 ? Math.round(recsWithReport.reduce((s, r) => s + (r.reporte?.potencial_captacion || 0), 0) / recsWithReport.length) : 0;
+                  const lastRec = recs[0];
+                  const daysSince = Math.floor((Date.now() - new Date(lastRec.created_at).getTime()) / 86400000);
+                  const isExpanded = expandedZones[zona] || false;
+
+                  return (
+                    <div key={zona} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                      <button onClick={() => setExpandedZones(prev => ({...prev, [zona]: !prev[zona]}))} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-100 transition-colors text-left">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 truncate">📍 {zona}</p>
+                          <p className="text-xs text-slate-500">{recs.length} recorrido{recs.length !== 1 ? 's' : ''} · Último: {daysSince === 0 ? 'hoy' : `hace ${daysSince}d`} · {formatDistance(totalKm)}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {avgPotencial > 0 && <div className="flex">{[1,2,3,4,5].map(n => <Star key={n} className={`w-3.5 h-3.5 ${n <= avgPotencial ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />)}</div>}
+                          {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-4 pb-3 space-y-2 border-t border-slate-200">
+                          {recs.map(r => (
+                            <div key={r.id} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
+                              <div className="text-xs text-slate-400 pt-0.5 w-20 shrink-0 font-medium">{new Date(r.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-700">{formatDistance(r.distancia_metros)}</span>
+                                  {r.reporte && <div className="flex">{[1,2,3,4,5].map(n => <Star key={n} className={`w-3 h-3 ${n <= (r.reporte?.potencial_captacion || 0) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />)}</div>}
+                                  {isAdmin && r.agente_email && <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{r.agente_email.split('@')[0]}</span>}
+                                </div>
+                                {r.reporte && (
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    {r.reporte.carteles_duenos !== '0' && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">🏠 {r.reporte.carteles_duenos}</span>}
+                                    {r.reporte.contactos_clave !== '0' && <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-md font-bold">🤝 {r.reporte.contactos_clave}</span>}
+                                    {r.reporte.receptividad !== 'Indiferente' && <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${r.reporte.receptividad === 'Receptiva' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{r.reporte.receptividad === 'Receptiva' ? '😊' : '😠'} {r.reporte.receptividad}</span>}
+                                  </div>
+                                )}
+                                {r.reporte?.notas && <p className="text-xs text-slate-500 italic mt-1 truncate">"{r.reporte.notas}"</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

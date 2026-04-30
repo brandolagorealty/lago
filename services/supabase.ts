@@ -896,14 +896,18 @@ export const propertyService = {
     return { success: true, data: rec };
   },
 
-  // Finish a recorrido (save route coords + distance)
-  async finishRecorrido(id: string, coordenadas_ruta: { lat: number; lng: number }[], distancia_metros: number): Promise<{ success: boolean; error?: string }> {
+  // Finish a recorrido (save route coords + distance + optional intelligence report)
+  async finishRecorrido(id: string, coordenadas_ruta: { lat: number; lng: number }[], distancia_metros: number, reporte?: import('../types').ReporteInteligencia): Promise<{ success: boolean; error?: string }> {
     if (!supabase) return { success: false, error: 'Supabase client not initialized' };
-    const { error } = await supabase.from('recorridos').update({
+    const updatePayload: any = {
       coordenadas_ruta,
       distancia_metros,
       fecha_fin: new Date().toISOString()
-    }).eq('id', id);
+    };
+    if (reporte) {
+      updatePayload.reporte = reporte;
+    }
+    const { error } = await supabase.from('recorridos').update(updatePayload).eq('id', id);
     if (error) return { success: false, error: error.message };
     return { success: true };
   },

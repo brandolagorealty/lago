@@ -138,6 +138,27 @@ export interface LagoNotification {
 }
 
 // Farming Inmobiliario
+
+export type RangoRapido = '0' | '1-3' | '4-10' | '10+';
+export type NivelActividad = 'Nula' | 'Baja' | 'Alta';
+export type NivelReceptividad = 'Hostil' | 'Indiferente' | 'Receptiva';
+
+export interface ReporteInteligencia {
+  // Sección 1: Oportunidades Detectadas
+  carteles_duenos: RangoRapido;
+  carteles_competencia: RangoRapido;
+  inmuebles_abandonados: RangoRapido;
+  // Sección 2: Trabajo de Siembra
+  contactos_clave: RangoRapido;
+  tarjetas_entregadas: RangoRapido;
+  // Sección 3: Termómetro de la Zona
+  actividad_construccion: NivelActividad;
+  receptividad: NivelReceptividad;
+  potencial_captacion: number; // 1-5 estrellas
+  // Sección 4: Observaciones
+  notas: string;
+}
+
 export interface Recorrido {
   id: string;
   agente_id?: string;
@@ -147,6 +168,7 @@ export interface Recorrido {
   fecha_inicio: string;
   fecha_fin?: string;
   distancia_metros: number;
+  reporte?: ReporteInteligencia;
   created_at: string;
 }
 
