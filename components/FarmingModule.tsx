@@ -251,7 +251,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
               {/* Available Grid Cells */}
               {isAdmin && availableGrid.map(cell => (
                 <Polygon key={cell.id} positions={cell.poligono.map(p => [p.lat, p.lng] as [number, number])}
-                  pathOptions={{ color: '#cbd5e1', weight: 1, dashArray: '4 4', fillOpacity: 0.05 }}
+                  pathOptions={{ color: '#3b82f6', weight: 2, dashArray: '5 5', fillOpacity: 0.1 }}
                   eventHandlers={{
                     click: () => {
                       setPendingGridCell(cell);
