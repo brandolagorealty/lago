@@ -27,5 +27,32 @@ export const SECTORS_DATA = {
     "Los Cortijos": ["Urbanización Los Cortijos", "Las Playitas", "El Samán", "zonas de granjas residenciales"],
     "Marcial Hernández": ["KM 4 (alrededores)", "Vía a Perijá", "Zona Industrial I y II", "El Silencio"],
     "José Domingo Rus": ["El Soler", "Caujarito", "La Conquista", "Villa Sur", "El Samán", "Urbanización Robinson Medina"]
+  },
+  "Municipio Miranda": {
+    "Altagracia": ["Los Hornitos", "Urbanización Miranda", "Altos del Vidrio", "El Calvario", "Felipe Baptista", "La Ensenada", "El Recreo", "Sector Buena Vista"],
+    "Ana María Campos": ["El Mecocal", "Huasimal", "La Amistad"],
+    "Faría": ["Quisiro", "Boca de Palmarito", "Torre Vigía"],
+    "Casigua": ["Casigua", "El Rocío"],
+    "San José": ["San José", "El Caimito"],
+    "San Antonio": ["Consejo de Ciruma", "El Pensado"]
+  },
+  "Municipio Cabimas": {
+    "Ambrosio": ["Ambrosio", "Miramar", "El Golf", "Amparo", "Las 40’s (parte alta)", "Urbanización El Sol", "La Misión"],
+    "Carmen Herrera": ["Concordia", "Miraflores", "Guabina", "Las 40’s", "Las 50’s", "El Lucero (parte)", "Casco Central de Cabimas"],
+    "La Rosa": ["La Rosa Viejo", "Las Cabillas", "R-1", "R-5", "Gasplant", "Campo Hollywood"],
+    "Germán Ríos Linares": ["Los Laureles", "Los Olivos", "Don Tulio", "12 de Octubre", "Hato Nuevo"],
+    "Jorge Hernández": ["El Lucero", "Barrio Nuevo", "Jorge Hernández", "Campo Lindo", "San Vicente"],
+    "Rómulo Betancourt": ["Nueva Cabimas", "El Dividive", "Punta Icotea"],
+    "San Benito": ["Haticos del Sur", "Santa Clara", "Villa Feliz", "23 de Enero"],
+    "Punta Gorda": ["Punta Gorda", "Urbanización San Benito", "Campo Alegre"],
+    "Arístides Calvani": ["Palito Blanco", "Curazaíto", "La Puerta"]
+  },
+  "Municipio Lagunillas": {
+    "Alonso de Ojeda": ["Casco Central", "Barrio Libertad", "Las Morochas", "Urbanización Tamare", "Las Rurales", "Barrio Obrero", "Sector La Granza", "Las 40's (Ojeda)"],
+    "Libertad": ["Barrio San José", "Urbanismo Fabricio Ojeda", "Nueva Venezuela", "El Menito"],
+    "El Danto": ["Sector El Danto I", "Sector El Danto II", "Sector El Danto III", "Octaviano Yépez"],
+    "Venezuela": ["Tasajeras", "Tía Juana"],
+    "Eleazar López Contreras": ["Campo Lara", "El Venado"],
+    "Campo Lara": ["Zonas agrícolas", "Bordes del municipio"]
   }
 };
