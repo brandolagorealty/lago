@@ -7,6 +7,7 @@ import { Recorrido, Captacion, ZonaFarming, UserRole } from '../types';
 import FarmingZonesPanel from './FarmingZonesPanel';
 import { useAuth } from '../auth/AuthProvider';
 import { generateMaracaiboGrid, GridCell } from '../constants/maracaiboZones';
+import { SECTORS_DATA } from '../constants/sectorsData';
 
 // Load Leaflet CSS from CDN
 if (!document.querySelector('link[href*="leaflet"]')) {
@@ -102,7 +103,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [selectedZona, setSelectedZona] = useState<ZonaFarming|null>(null);
   const [pendingGridCell, setPendingGridCell] = useState<GridCell | null>(null);
-  const [assignForm, setAssignForm] = useState({ nombre: '', asignado_a: '', asignado_email: '' });
+  const [assignForm, setAssignForm] = useState({ municipio: '', parroquia: '', sector: '', asignado_a: '', asignado_email: '' });
 
   useEffect(() => { loadData(); }, []);
 
@@ -255,7 +256,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                   eventHandlers={{
                     click: () => {
                       setPendingGridCell(cell);
-                      setAssignForm({ nombre: '', asignado_a: '', asignado_email: '' });
+                      setAssignForm({ municipio: '', parroquia: '', sector: '', asignado_a: '', asignado_email: '' });
                     }
                   }}>
                   <Popup><div className="text-xs font-bold text-slate-500">Haz clic para asignar esta zona</div></Popup>
@@ -351,9 +352,28 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             </div>
             
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Municipio</label>
+                  <select value={assignForm.municipio} onChange={e => setAssignForm({...assignForm, municipio: e.target.value, parroquia: '', sector: ''})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    <option value="">Seleccionar...</option>
+                    {Object.keys(SECTORS_DATA).map(m => <option key={m} value={m}>{m.replace('Municipio ', '')}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Parroquia</label>
+                  <select value={assignForm.parroquia} onChange={e => setAssignForm({...assignForm, parroquia: e.target.value, sector: ''})} disabled={!assignForm.municipio} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50">
+                    <option value="">Seleccionar...</option>
+                    {assignForm.municipio && Object.keys(SECTORS_DATA[assignForm.municipio as keyof typeof SECTORS_DATA]).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Nombre de la Zona / Sector</label>
-                <input value={assignForm.nombre} onChange={e => setAssignForm({...assignForm, nombre: e.target.value})} placeholder="Ej: Tierra Negra, Sector 2..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" autoFocus />
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Sector a peinar</label>
+                <select value={assignForm.sector} onChange={e => setAssignForm({...assignForm, sector: e.target.value})} disabled={!assignForm.parroquia} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50">
+                  <option value="">📍 Seleccionar sector...</option>
+                  {assignForm.municipio && assignForm.parroquia && SECTORS_DATA[assignForm.municipio as keyof typeof SECTORS_DATA][assignForm.parroquia as keyof typeof SECTORS_DATA[keyof typeof SECTORS_DATA]].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Asesor Asignado</label>
@@ -370,11 +390,11 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             <div className="flex gap-3 pt-4 border-t border-slate-100">
               <button onClick={() => setPendingGridCell(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-all">Cancelar</button>
               <button onClick={async () => {
-                if (!assignForm.nombre || !assignForm.asignado_a) return;
+                if (!assignForm.sector || !assignForm.asignado_a) return;
                 setIsSaving(true);
                 const color = COLORS[zonas.length % COLORS.length];
                 await propertyService.createZonaFarming({
-                  nombre: assignForm.nombre,
+                  nombre: assignForm.sector,
                   poligono: pendingGridCell.poligono,
                   color,
                   meta_km: pendingGridCell.meta_km,
@@ -386,7 +406,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 setIsSaving(false);
                 setPendingGridCell(null);
                 loadData();
-              }} disabled={isSaving || !assignForm.nombre || !assignForm.asignado_a} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-600/20">
+              }} disabled={isSaving || !assignForm.sector || !assignForm.asignado_a} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-600/20">
                 {isSaving ? 'Guardando...' : 'Asignar Zona'}
               </button>
             </div>
