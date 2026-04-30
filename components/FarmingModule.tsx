@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route } from 'lucide-react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
+import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame } from 'lucide-react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { propertyService } from '../services/supabase';
+import { Recorrido, Captacion, ZonaFarming, UserRole } from '../types';
+import FarmingZonesPanel from './FarmingZonesPanel';
 
-// Load Leaflet CSS from CDN to avoid build issues
+// Load Leaflet CSS from CDN
 if (!document.querySelector('link[href*="leaflet"]')) {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
   document.head.appendChild(link);
 }
-import { Recorrido, Captacion } from '../types';
 
 // Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -26,11 +27,8 @@ const MIN_DISTANCE_METERS = 15;
 
 const captacionIcon = new L.DivIcon({
   className: '',
-  html: `<div style="background:#10b981;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-  </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  html: `<div style="background:#10b981;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
+  iconSize: [28, 28], iconAnchor: [14, 14],
 });
 
 function haversineDistance(a: {lat:number;lng:number}, b: {lat:number;lng:number}): number {
@@ -45,15 +43,52 @@ function formatDistance(m: number): string {
   return m >= 1000 ? (m/1000).toFixed(1) + ' km' : Math.round(m) + ' m';
 }
 
-// Sub-component to recenter map
 function RecenterMap({ position }: { position: [number, number] | null }) {
   const map = useMap();
   useEffect(() => { if (position) map.setView(position, map.getZoom()); }, [position]);
   return null;
 }
 
-export default function FarmingModule() {
-  // Route tracking state
+// Heatmap layer component
+function HeatmapLayer({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  const layerRef = useRef<any>(null);
+  useEffect(() => {
+    if (points.length === 0) return;
+    try {
+      const heat = (L as any).heatLayer(points.map(p => [...p, 0.6]), { radius: 18, blur: 20, maxZoom: 17, gradient: { 0.2: '#3b82f6', 0.4: '#06b6d4', 0.6: '#fbbf24', 0.8: '#f97316', 1: '#ef4444' } });
+      heat.addTo(map);
+      layerRef.current = heat;
+    } catch(e) { console.warn('Heatmap not available'); }
+    return () => { if (layerRef.current) map.removeLayer(layerRef.current); };
+  }, [points, map]);
+  return null;
+}
+
+// Drawing handler for polygon creation
+function DrawHandler({ onComplete }: { onComplete: (pts: {lat:number;lng:number}[]) => void }) {
+  const [pts, setPts] = useState<{lat:number;lng:number}[]>([]);
+  useMapEvents({
+    click(e) { setPts(prev => [...prev, { lat: e.latlng.lat, lng: e.latlng.lng }]); },
+    dblclick(e) { 
+      e.originalEvent.preventDefault();
+      if (pts.length >= 3) onComplete([...pts, { lat: e.latlng.lat, lng: e.latlng.lng }]);
+      setPts([]);
+    }
+  });
+  if (pts.length < 2) return null;
+  return <Polyline positions={pts.map(p => [p.lat, p.lng] as [number,number])} pathOptions={{ color: '#10b981', weight: 2, dashArray: '6 4' }} />;
+}
+
+interface FarmingProps {
+  currentUserRole: 'superadmin' | 'asesor' | null;
+  userRoles: UserRole[];
+}
+
+export default function FarmingModule({ currentUserRole, userRoles }: FarmingProps) {
+  const isAdmin = currentUserRole === 'superadmin';
+
+  // Route tracking
   const [isTracking, setIsTracking] = useState(false);
   const [routeCoords, setRouteCoords] = useState<{lat:number;lng:number}[]>([]);
   const [activeRecorridoId, setActiveRecorridoId] = useState<string|null>(null);
@@ -62,127 +97,102 @@ export default function FarmingModule() {
   const watchIdRef = useRef<number|null>(null);
   const [zoneName, setZoneName] = useState('');
 
-  // Data state
+  // Data
   const [recorridos, setRecorridos] = useState<Recorrido[]>([]);
   const [captaciones, setCaptaciones] = useState<Captacion[]>([]);
+  const [zonas, setZonas] = useState<ZonaFarming[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Capture modal
+  // UI state
   const [showCapture, setShowCapture] = useState(false);
   const [captureForm, setCaptureForm] = useState({ tipo_inmueble: 'Casa', estatus: 'Se Vende', telefono_contacto: '', notas: '' });
-
-  // History panel
   const [showHistory, setShowHistory] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [selectedZona, setSelectedZona] = useState<ZonaFarming|null>(null);
+  const [pendingZonaForm, setPendingZonaForm] = useState<any>(null);
 
-  // Load data on mount
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setIsLoading(true);
-    const [recs, caps] = await Promise.all([
-      propertyService.getRecorridos(),
-      propertyService.getCaptaciones()
+    const [recs, caps, zns] = await Promise.all([
+      propertyService.getRecorridos(), propertyService.getCaptaciones(), propertyService.getZonasFarming()
     ]);
-    setRecorridos(recs);
-    setCaptaciones(caps);
+    setRecorridos(recs); setCaptaciones(caps); setZonas(zns);
     setIsLoading(false);
   };
 
-  // Calculate total distance for current route
-  const currentDistance = routeCoords.reduce((sum, coord, i) => {
-    if (i === 0) return 0;
-    return sum + haversineDistance(routeCoords[i-1], coord);
-  }, 0);
+  const currentDistance = routeCoords.reduce((sum, c, i) => i === 0 ? 0 : sum + haversineDistance(routeCoords[i-1], c), 0);
 
-  // Start GPS tracking
+  // GPS tracking
   const startTracking = useCallback(async () => {
-    if (!navigator.geolocation) {
-      setGpsError('Tu navegador no soporta GPS.');
-      return;
-    }
-
-    setGpsError(null);
-    setIsSaving(true);
-
-    // Create recorrido in DB
+    if (!navigator.geolocation) { setGpsError('Tu navegador no soporta GPS.'); return; }
+    setGpsError(null); setIsSaving(true);
     const result = await propertyService.createRecorrido({ zona_nombre: zoneName || 'Sin nombre' });
-    if (!result.success || !result.data) {
-      setGpsError('Error al crear el recorrido: ' + result.error);
-      setIsSaving(false);
-      return;
-    }
-
-    setActiveRecorridoId(result.data.id);
-    setRouteCoords([]);
-    setIsSaving(false);
-    setIsTracking(true);
-
+    if (!result.success) { setGpsError('Error: ' + result.error); setIsSaving(false); return; }
+    setActiveRecorridoId(result.data.id); setRouteCoords([]); setIsSaving(false); setIsTracking(true);
     const id = navigator.geolocation.watchPosition(
       (pos) => {
-        const newCoord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserPosition([newCoord.lat, newCoord.lng]);
+        const nc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserPosition([nc.lat, nc.lng]);
         setRouteCoords(prev => {
-          if (prev.length === 0) return [newCoord];
-          const last = prev[prev.length - 1];
-          if (haversineDistance(last, newCoord) < MIN_DISTANCE_METERS) return prev;
-          return [...prev, newCoord];
+          if (prev.length === 0) return [nc];
+          if (haversineDistance(prev[prev.length-1], nc) < MIN_DISTANCE_METERS) return prev;
+          return [...prev, nc];
         });
       },
-      (err) => {
-        setGpsError(err.code === 1 ? 'Permiso de ubicación denegado. Activa el GPS.' : 'Error de GPS: ' + err.message);
-      },
+      (err) => { setGpsError(err.code === 1 ? 'Permiso de GPS denegado.' : 'Error GPS: ' + err.message); },
       { enableHighAccuracy: true, maximumAge: 5000 }
     );
     watchIdRef.current = id;
   }, [zoneName]);
 
-  // Stop GPS tracking
   const stopTracking = useCallback(async () => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
+    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setIsTracking(false);
-
     if (activeRecorridoId && routeCoords.length > 0) {
       setIsSaving(true);
       await propertyService.finishRecorrido(activeRecorridoId, routeCoords, currentDistance);
-      setIsSaving(false);
-      setActiveRecorridoId(null);
-      setRouteCoords([]);
-      setZoneName('');
+      setIsSaving(false); setActiveRecorridoId(null); setRouteCoords([]); setZoneName('');
       loadData();
     }
   }, [activeRecorridoId, routeCoords, currentDistance]);
 
-  // Save a captacion
   const saveCaptacion = async () => {
-    if (!userPosition) { setGpsError('No se pudo obtener tu ubicación GPS.'); return; }
+    if (!userPosition) { setGpsError('No se pudo obtener ubicación GPS.'); return; }
     setIsSaving(true);
-    await propertyService.createCaptacion({
-      recorrido_id: activeRecorridoId,
-      latitud: userPosition[0],
-      longitud: userPosition[1],
-      ...captureForm
-    });
-    setIsSaving(false);
-    setShowCapture(false);
+    await propertyService.createCaptacion({ recorrido_id: activeRecorridoId, latitud: userPosition[0], longitud: userPosition[1], ...captureForm });
+    setIsSaving(false); setShowCapture(false);
     setCaptureForm({ tipo_inmueble: 'Casa', estatus: 'Se Vende', telefono_contacto: '', notas: '' });
     loadData();
   };
 
-  // Delete a recorrido
   const handleDeleteRecorrido = async (id: string) => {
-    if (!confirm('¿Eliminar este recorrido y todas sus captaciones?')) return;
-    await propertyService.deleteRecorrido(id);
-    loadData();
+    if (!confirm('¿Eliminar recorrido?')) return;
+    await propertyService.deleteRecorrido(id); loadData();
   };
 
-  const todayRecorridos = recorridos.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString());
-  const totalDistance = recorridos.reduce((s, r) => s + (r.distancia_metros || 0), 0);
+  // Handle polygon drawing complete
+  const handlePolygonComplete = async (pts: {lat:number;lng:number}[]) => {
+    setIsDrawing(false);
+    if (!pendingZonaForm) return;
+    await propertyService.createZonaFarming({ ...pendingZonaForm, poligono: pts, estado: 'pendiente', km_recorridos: 0 });
+    setPendingZonaForm(null); loadData();
+  };
+
+  // Heatmap points from all recorridos
+  const heatPoints: [number,number][] = recorridos.flatMap(r => (r.coordenadas_ruta || []).map((c: any) => [c.lat, c.lng] as [number,number]));
+
+  const todayRecs = recorridos.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString());
+  const totalDist = recorridos.reduce((s, r) => s + (r.distancia_metros || 0), 0);
+
+  // Zone color based on progress
+  const getZoneOpacity = (z: ZonaFarming) => {
+    const pct = z.meta_km > 0 ? (z.km_recorridos / z.meta_km) * 100 : 0;
+    return pct >= 75 ? 0.15 : pct >= 25 ? 0.25 : 0.35;
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-500">
@@ -190,189 +200,140 @@ export default function FarmingModule() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-serif font-bold text-slate-900 flex items-center gap-3">
-            <Navigation className="w-8 h-8 text-emerald-600" />
-            Farming Inmobiliario
+            <Navigation className="w-8 h-8 text-emerald-600" /> Farming Inmobiliario
           </h2>
-          <p className="text-slate-500 mt-1 text-lg">Peinado de zonas con GPS en tiempo real</p>
+          <p className="text-slate-500 mt-1">Peinado de zonas con GPS · Maracaibo y San Francisco</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-2xl text-center">
-            <p className="text-2xl font-black text-emerald-700">{todayRecorridos.length}</p>
-            <p className="text-[10px] font-bold text-emerald-500 uppercase">Recorridos Hoy</p>
+            <p className="text-2xl font-black text-emerald-700">{todayRecs.length}</p>
+            <p className="text-[10px] font-bold text-emerald-500 uppercase">Hoy</p>
           </div>
           <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-2xl text-center">
             <p className="text-2xl font-black text-blue-700">{captaciones.length}</p>
             <p className="text-[10px] font-bold text-blue-500 uppercase">Captaciones</p>
           </div>
           <div className="bg-purple-50 border border-purple-200 px-4 py-2 rounded-2xl text-center">
-            <p className="text-2xl font-black text-purple-700">{formatDistance(totalDistance)}</p>
-            <p className="text-[10px] font-bold text-purple-500 uppercase">Total Recorrido</p>
+            <p className="text-2xl font-black text-purple-700">{formatDistance(totalDist)}</p>
+            <p className="text-[10px] font-bold text-purple-500 uppercase">Total</p>
           </div>
         </div>
       </div>
 
-      {/* GPS Error Banner */}
-      {gpsError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm font-medium flex items-center gap-2">
-          <MapPin className="w-5 h-5 flex-shrink-0" /> {gpsError}
-        </div>
-      )}
+      {gpsError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm font-medium flex items-center gap-2"><MapPin className="w-5 h-5" /> {gpsError}</div>}
 
-      {/* Map + Controls */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Zone name input (when not tracking) */}
-        {!isTracking && (
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-            <MapPin className="w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              value={zoneName}
-              onChange={e => setZoneName(e.target.value)}
-              placeholder="Nombre de la zona a recorrer (Ej: Sector La Lago)..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-          </div>
-        )}
+      {isDrawing && <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-2xl text-sm font-bold animate-pulse">✏️ Modo Dibujo: Haz clic en el mapa para marcar los vértices de la zona. Doble clic para terminar.</div>}
 
-        {/* Tracking status bar */}
-        {isTracking && (
-          <div className="px-4 py-3 border-b border-emerald-200 bg-emerald-50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-sm font-bold text-emerald-800">
-                Recorriendo: {zoneName || 'Sin nombre'}
-              </span>
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Map Column */}
+        <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          {!isTracking && (
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-slate-400" />
+              <input type="text" value={zoneName} onChange={e => setZoneName(e.target.value)} placeholder="Nombre de la zona a recorrer..." className="flex-1 bg-transparent text-sm outline-none" />
             </div>
-            <div className="flex items-center gap-4 text-xs font-bold text-emerald-600">
-              <span>{routeCoords.length} puntos</span>
-              <span>{formatDistance(currentDistance)}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Map */}
-        <div style={{ height: '55vh', minHeight: 350 }}>
-          <MapContainer
-            center={MARACAIBO_CENTER}
-            zoom={14}
-            style={{ height: '100%', width: '100%' }}
-            zoomControl={false}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <RecenterMap position={isTracking ? userPosition : null} />
-
-            {/* Past routes (gray) */}
-            {recorridos.map(r => r.coordenadas_ruta && r.coordenadas_ruta.length > 1 && (
-              <Polyline
-                key={r.id}
-                positions={r.coordenadas_ruta.map(c => [c.lat, c.lng] as [number, number])}
-                pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '8 6' }}
-              />
-            ))}
-
-            {/* Active route (green) */}
-            {routeCoords.length > 1 && (
-              <Polyline
-                positions={routeCoords.map(c => [c.lat, c.lng] as [number, number])}
-                pathOptions={{ color: '#10b981', weight: 5, opacity: 0.9 }}
-              />
-            )}
-
-            {/* User position marker */}
-            {userPosition && isTracking && (
-              <Marker position={userPosition} icon={new L.DivIcon({
-                className: '',
-                html: `<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,.2), 0 2px 6px rgba(0,0,0,.3);"></div>`,
-                iconSize: [18, 18], iconAnchor: [9, 9]
-              })} />
-            )}
-
-            {/* Captacion markers */}
-            {captaciones.map(c => (
-              <Marker key={c.id} position={[c.latitud, c.longitud]} icon={captacionIcon}>
-                <Popup>
-                  <div className="text-xs space-y-1 min-w-[160px]">
-                    <p className="font-bold text-slate-900">{c.tipo_inmueble}</p>
-                    <p className="text-emerald-600 font-semibold">{c.estatus}</p>
-                    {c.telefono_contacto && <p>📞 {c.telefono_contacto}</p>}
-                    {c.notas && <p className="text-slate-500 italic">{c.notas}</p>}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        </div>
-
-        {/* Control buttons */}
-        <div className="px-4 py-4 border-t border-slate-100 flex items-center gap-3">
-          {!isTracking ? (
-            <button
-              onClick={startTracking}
-              disabled={isSaving}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-3"
-            >
-              <Play className="w-6 h-6" /> {isSaving ? 'Iniciando...' : 'Iniciar Recorrido'}
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={stopTracking}
-                disabled={isSaving}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-red-600/20 active:scale-95 flex items-center justify-center gap-3"
-              >
-                <Square className="w-6 h-6" /> {isSaving ? 'Guardando...' : 'Detener'}
-              </button>
-              <button
-                onClick={() => setShowCapture(true)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-600/20 active:scale-95 flex items-center justify-center gap-3"
-              >
-                <Plus className="w-6 h-6" /> Añadir Inmueble
-              </button>
-            </>
           )}
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-colors"
-            title="Historial"
-          >
-            <Clock className="w-6 h-6" />
-          </button>
+          {isTracking && (
+            <div className="px-4 py-3 border-b border-emerald-200 bg-emerald-50 flex items-center justify-between">
+              <div className="flex items-center gap-3"><div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" /><span className="text-sm font-bold text-emerald-800">Recorriendo: {zoneName || 'Sin nombre'}</span></div>
+              <div className="flex gap-4 text-xs font-bold text-emerald-600"><span>{routeCoords.length} pts</span><span>{formatDistance(currentDistance)}</span></div>
+            </div>
+          )}
+
+          <div style={{ height: '55vh', minHeight: 350 }}>
+            <MapContainer center={MARACAIBO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+              <TileLayer attribution='&copy; OSM' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <RecenterMap position={isTracking ? userPosition : null} />
+              {isDrawing && <DrawHandler onComplete={handlePolygonComplete} />}
+              {showHeatmap && <HeatmapLayer points={heatPoints} />}
+
+              {/* Zones as polygons */}
+              {zonas.map(z => z.poligono && z.poligono.length >= 3 && (
+                <Polygon key={z.id} positions={z.poligono.map(p => [p.lat, p.lng] as [number,number])}
+                  pathOptions={{ color: z.color, fillColor: z.color, fillOpacity: getZoneOpacity(z), weight: selectedZona?.id === z.id ? 3 : 1 }}>
+                  <Popup><div className="text-xs"><p className="font-bold">{z.nombre}</p><p>{z.asignado_email || 'Sin asignar'}</p><p>{z.meta_km > 0 ? Math.round((z.km_recorridos/z.meta_km)*100) : 0}% cubierto</p></div></Popup>
+                </Polygon>
+              ))}
+
+              {/* Past routes */}
+              {recorridos.map(r => r.coordenadas_ruta && r.coordenadas_ruta.length > 1 && (
+                <Polyline key={r.id} positions={r.coordenadas_ruta.map((c: any) => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '8 6' }} />
+              ))}
+
+              {/* Active route */}
+              {routeCoords.length > 1 && <Polyline positions={routeCoords.map(c => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#10b981', weight: 5, opacity: 0.9 }} />}
+
+              {/* User position */}
+              {userPosition && isTracking && <Marker position={userPosition} icon={new L.DivIcon({ className: '', html: `<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,.2)"></div>`, iconSize: [18,18], iconAnchor: [9,9] })} />}
+
+              {/* Captacion markers */}
+              {captaciones.map(c => (
+                <Marker key={c.id} position={[c.latitud, c.longitud]} icon={captacionIcon}>
+                  <Popup><div className="text-xs min-w-[140px]"><p className="font-bold">{c.tipo_inmueble}</p><p className="text-emerald-600">{c.estatus}</p>{c.telefono_contacto && <p>📞 {c.telefono_contacto}</p>}{c.notas && <p className="italic text-slate-500">{c.notas}</p>}</div></Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+
+          {/* Controls */}
+          <div className="px-4 py-4 border-t border-slate-100 flex items-center gap-3 flex-wrap">
+            {!isTracking ? (
+              <button onClick={startTracking} disabled={isSaving} className="flex-1 min-w-[200px] bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3">
+                <Play className="w-6 h-6" /> {isSaving ? 'Iniciando...' : 'Iniciar Recorrido'}
+              </button>
+            ) : (
+              <>
+                <button onClick={stopTracking} disabled={isSaving} className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center gap-3">
+                  <Square className="w-6 h-6" /> {isSaving ? 'Guardando...' : 'Detener'}
+                </button>
+                <button onClick={() => setShowCapture(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center gap-3">
+                  <Plus className="w-6 h-6" /> Inmueble
+                </button>
+              </>
+            )}
+            <button onClick={() => setShowHeatmap(!showHeatmap)} className={`p-4 rounded-2xl transition-colors ${showHeatmap ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Mapa de Calor">
+              <Flame className="w-6 h-6" />
+            </button>
+            <button onClick={() => setShowHistory(!showHistory)} className={`p-4 rounded-2xl transition-colors ${showHistory ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Historial">
+              <Clock className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Zones Panel (right side) */}
+        <div className="w-full lg:w-80 shrink-0">
+          <FarmingZonesPanel zonas={zonas} recorridos={recorridos} userRoles={userRoles || []} isAdmin={isAdmin}
+            onRefresh={loadData} onSelectZona={setSelectedZona} selectedZona={selectedZona} />
+          {isAdmin && !isDrawing && (
+            <button onClick={() => { setIsDrawing(true); setPendingZonaForm({ nombre: 'Nueva Zona', meta_km: 25, color: '#10b981', asignado_a: '', asignado_email: '' }); }}
+              className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2">
+              ✏️ Dibujar Zona en Mapa
+            </button>
+          )}
+          {isDrawing && (
+            <button onClick={() => { setIsDrawing(false); setPendingZonaForm(null); }}
+              className="w-full mt-3 bg-red-500 hover:bg-red-600 text-white py-3 rounded-2xl font-bold text-sm transition-all">
+              Cancelar Dibujo
+            </button>
+          )}
         </div>
       </div>
 
-      {/* History Panel */}
+      {/* History */}
       {showHistory && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Route className="w-5 h-5 text-slate-400" /> Historial de Recorridos
-          </h3>
-          {recorridos.length === 0 ? (
-            <p className="text-sm text-slate-400 italic py-6 text-center">No hay recorridos registrados aún.</p>
-          ) : (
-            <div className="space-y-3">
-              {recorridos.map(r => {
-                const rCaptaciones = captaciones.filter(c => c.recorrido_id === r.id);
-                return (
-                  <div key={r.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                      <MapPin className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-slate-900 truncate">{r.zona_nombre}</p>
-                      <p className="text-xs text-slate-500">
-                        {r.agente_email?.split('@')[0]} · {new Date(r.created_at).toLocaleDateString()} · {formatDistance(r.distancia_metros)} · {rCaptaciones.length} captaciones
-                      </p>
-                    </div>
-                    <button onClick={() => handleDeleteRecorrido(r.id)} className="p-2 hover:bg-red-50 rounded-full text-red-400 hover:text-red-600 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Route className="w-5 h-5 text-slate-400" /> Historial</h3>
+          {recorridos.length === 0 ? <p className="text-sm text-slate-400 italic text-center py-4">Sin recorridos.</p> : (
+            <div className="space-y-2">{recorridos.map(r => (
+              <div key={r.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><MapPin className="w-5 h-5" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 truncate">{r.zona_nombre}</p>
+                  <p className="text-xs text-slate-500">{r.agente_email?.split('@')[0]} · {new Date(r.created_at).toLocaleDateString()} · {formatDistance(r.distancia_metros)}</p>
+                </div>
+                {(isAdmin || true) && <button onClick={() => handleDeleteRecorrido(r.id)} className="p-2 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
+              </div>
+            ))}</div>
           )}
         </div>
       )}
@@ -380,54 +341,39 @@ export default function FarmingModule() {
       {/* Capture Modal */}
       {showCapture && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full md:max-w-md md:rounded-3xl rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="bg-white w-full md:max-w-md md:rounded-3xl rounded-t-3xl shadow-2xl">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-600" /> Captura Rápida
-              </h3>
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2"><MapPin className="w-5 h-5 text-emerald-600" /> Captura Rápida</h3>
               <button onClick={() => setShowCapture(false)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Tipo de Inmueble</label>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Tipo</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Casa', 'Apartamento', 'Local', 'Terreno'].map(t => (
-                    <button key={t} onClick={() => setCaptureForm({...captureForm, tipo_inmueble: t})}
-                      className={`py-3 rounded-xl font-bold text-sm transition-all ${captureForm.tipo_inmueble === t ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                    >{t}</button>
+                  {['Casa','Apartamento','Local','Terreno'].map(t => (
+                    <button key={t} onClick={() => setCaptureForm({...captureForm, tipo_inmueble: t})} className={`py-3 rounded-xl font-bold text-sm ${captureForm.tipo_inmueble === t ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}`}>{t}</button>
                   ))}
                 </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Estatus</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['Se Vende', 'Se Alquila', 'Potencial'].map(s => (
-                    <button key={s} onClick={() => setCaptureForm({...captureForm, estatus: s})}
-                      className={`py-3 rounded-xl font-bold text-sm transition-all ${captureForm.estatus === s ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                    >{s}</button>
+                  {['Se Vende','Se Alquila','Potencial'].map(s => (
+                    <button key={s} onClick={() => setCaptureForm({...captureForm, estatus: s})} className={`py-3 rounded-xl font-bold text-sm ${captureForm.estatus === s ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}`}>{s}</button>
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Teléfono de Contacto</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="tel" value={captureForm.telefono_contacto} onChange={e => setCaptureForm({...captureForm, telefono_contacto: e.target.value})}
-                    placeholder="0424-1234567" className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
+              <div className="relative">
+                <Phone className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="tel" value={captureForm.telefono_contacto} onChange={e => setCaptureForm({...captureForm, telefono_contacto: e.target.value})} placeholder="Teléfono" className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" />
               </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Notas</label>
-                <div className="relative">
-                  <FileText className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
-                  <textarea value={captureForm.notas} onChange={e => setCaptureForm({...captureForm, notas: e.target.value})}
-                    placeholder="Detalles del inmueble..." rows={2} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none" />
-                </div>
+              <div className="relative">
+                <FileText className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
+                <textarea value={captureForm.notas} onChange={e => setCaptureForm({...captureForm, notas: e.target.value})} placeholder="Notas..." rows={2} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none resize-none" />
               </div>
             </div>
             <div className="p-6 border-t border-slate-100">
-              <button onClick={saveCaptacion} disabled={isSaving}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+              <button onClick={saveCaptacion} disabled={isSaving} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-bold text-lg active:scale-95 flex items-center justify-center gap-2">
                 {isSaving ? 'Guardando...' : '📌 Guardar Captación'}
               </button>
             </div>

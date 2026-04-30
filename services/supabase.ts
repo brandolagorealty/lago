@@ -956,6 +956,36 @@ export const propertyService = {
     const { error } = await supabase.from('captaciones').delete().eq('id', id);
     if (error) return { success: false, error: error.message };
     return { success: true };
+  },
+
+  // Farming Zones CRUD
+  async getZonasFarming(): Promise<any[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('zonas_farming').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching zonas:', error); return []; }
+    return data || [];
+  },
+
+  async createZonaFarming(zona: any): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('zonas_farming').insert([{ ...zona, created_by: user?.id }]);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  async updateZonaFarming(id: string, updates: any): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('zonas_farming').update(updates).eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  async deleteZonaFarming(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('zonas_farming').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
   }
 };
 

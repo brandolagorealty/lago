@@ -162,3 +162,18 @@ export interface Captacion {
   notas?: string;
   created_at: string;
 }
+
+export interface ZonaFarming {
+  id: string;
+  nombre: string;
+  poligono: { lat: number; lng: number }[];
+  color: string;
+  asignado_a?: string;
+  asignado_email?: string;
+  meta_km: number;
+  km_recorridos: number;
+  estado: 'pendiente' | 'en_progreso' | 'completada';
+  prioridad: number;
+  created_by?: string;
+  created_at: string;
+}

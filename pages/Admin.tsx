@@ -695,7 +695,7 @@ const Admin: React.FC = () => {
                 )}
                 {activeTab === 'farming' && (
                     <div className="flex-1 animate-in fade-in space-y-4">
-                        <FarmingModule />
+                        <FarmingModule currentUserRole={currentUserRole} userRoles={userRoles} />
                     </div>
                 )}
 
