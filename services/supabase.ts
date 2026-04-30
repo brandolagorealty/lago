@@ -873,6 +873,89 @@ export const propertyService = {
       .subscribe();
 
     return channel;
+  },
+
+  // =====================================================================
+  // FARMING INMOBILIARIO
+  // =====================================================================
+
+  // Create a new recorrido (route)
+  async createRecorrido(data: { zona_nombre?: string }): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const { data: rec, error } = await supabase.from('recorridos').insert([{
+      agente_id: user.id,
+      agente_email: user.email,
+      zona_nombre: data.zona_nombre || 'Sin nombre',
+      fecha_inicio: new Date().toISOString()
+    }]).select().single();
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: rec };
+  },
+
+  // Finish a recorrido (save route coords + distance)
+  async finishRecorrido(id: string, coordenadas_ruta: { lat: number; lng: number }[], distancia_metros: number): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('recorridos').update({
+      coordenadas_ruta,
+      distancia_metros,
+      fecha_fin: new Date().toISOString()
+    }).eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  // Get all recorridos (visible to all team)
+  async getRecorridos(): Promise<any[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('recorridos')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching recorridos:', error); return []; }
+    return data || [];
+  },
+
+  // Delete a recorrido
+  async deleteRecorrido(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('recorridos').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  // Create a captacion (property capture)
+  async createCaptacion(data: any): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const { error } = await supabase.from('captaciones').insert([{
+      ...data,
+      agente_id: user.id
+    }]);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  // Get captaciones (optionally filtered by recorrido)
+  async getCaptaciones(recorridoId?: string): Promise<any[]> {
+    if (!supabase) return [];
+    let query = supabase.from('captaciones').select('*').order('created_at', { ascending: false });
+    if (recorridoId) query = query.eq('recorrido_id', recorridoId);
+    const { data, error } = await query;
+    if (error) { console.error('Error fetching captaciones:', error); return []; }
+    return data || [];
+  },
+
+  // Delete a captacion
+  async deleteCaptacion(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('captaciones').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
   }
 };
 

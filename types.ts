@@ -137,3 +137,28 @@ export interface LagoNotification {
   created_at: string;
 }
 
+// Farming Inmobiliario
+export interface Recorrido {
+  id: string;
+  agente_id?: string;
+  agente_email?: string;
+  zona_nombre: string;
+  coordenadas_ruta: { lat: number; lng: number }[];
+  fecha_inicio: string;
+  fecha_fin?: string;
+  distancia_metros: number;
+  created_at: string;
+}
+
+export interface Captacion {
+  id: string;
+  recorrido_id?: string;
+  agente_id?: string;
+  latitud: number;
+  longitud: number;
+  tipo_inmueble: string;
+  estatus: string;
+  telefono_contacto?: string;
+  notas?: string;
+  created_at: string;
+}

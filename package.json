@@ -13,15 +13,18 @@
     "@google/genai": "^1.34.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
+    "@types/leaflet": "^1.9.21",
     "browser-image-compression": "^2.0.2",
     "cheerio": "^1.2.0",
     "googleapis": "^171.4.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
     "marked": "^18.0.0",
     "node-fetch": "^3.3.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-image-crop": "^11.0.10",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.11.0"
   },
   "devDependencies": {

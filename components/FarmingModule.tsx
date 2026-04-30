@@ -1,0 +1,439 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route } from 'lucide-react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import { propertyService } from '../services/supabase';
+
+// Load Leaflet CSS from CDN to avoid build issues
+if (!document.querySelector('link[href*="leaflet"]')) {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+  document.head.appendChild(link);
+}
+import { Recorrido, Captacion } from '../types';
+
+// Fix Leaflet default marker icons
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+const MARACAIBO_CENTER: [number, number] = [10.6666, -71.6124];
+const MIN_DISTANCE_METERS = 15;
+
+const captacionIcon = new L.DivIcon({
+  className: '',
+  html: `<div style="background:#10b981;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+  </div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
+function haversineDistance(a: {lat:number;lng:number}, b: {lat:number;lng:number}): number {
+  const R = 6371000;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+function formatDistance(m: number): string {
+  return m >= 1000 ? (m/1000).toFixed(1) + ' km' : Math.round(m) + ' m';
+}
+
+// Sub-component to recenter map
+function RecenterMap({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => { if (position) map.setView(position, map.getZoom()); }, [position]);
+  return null;
+}
+
+export default function FarmingModule() {
+  // Route tracking state
+  const [isTracking, setIsTracking] = useState(false);
+  const [routeCoords, setRouteCoords] = useState<{lat:number;lng:number}[]>([]);
+  const [activeRecorridoId, setActiveRecorridoId] = useState<string|null>(null);
+  const [userPosition, setUserPosition] = useState<[number,number]|null>(null);
+  const [gpsError, setGpsError] = useState<string|null>(null);
+  const watchIdRef = useRef<number|null>(null);
+  const [zoneName, setZoneName] = useState('');
+
+  // Data state
+  const [recorridos, setRecorridos] = useState<Recorrido[]>([]);
+  const [captaciones, setCaptaciones] = useState<Captacion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Capture modal
+  const [showCapture, setShowCapture] = useState(false);
+  const [captureForm, setCaptureForm] = useState({ tipo_inmueble: 'Casa', estatus: 'Se Vende', telefono_contacto: '', notas: '' });
+
+  // History panel
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const [recs, caps] = await Promise.all([
+      propertyService.getRecorridos(),
+      propertyService.getCaptaciones()
+    ]);
+    setRecorridos(recs);
+    setCaptaciones(caps);
+    setIsLoading(false);
+  };
+
+  // Calculate total distance for current route
+  const currentDistance = routeCoords.reduce((sum, coord, i) => {
+    if (i === 0) return 0;
+    return sum + haversineDistance(routeCoords[i-1], coord);
+  }, 0);
+
+  // Start GPS tracking
+  const startTracking = useCallback(async () => {
+    if (!navigator.geolocation) {
+      setGpsError('Tu navegador no soporta GPS.');
+      return;
+    }
+
+    setGpsError(null);
+    setIsSaving(true);
+
+    // Create recorrido in DB
+    const result = await propertyService.createRecorrido({ zona_nombre: zoneName || 'Sin nombre' });
+    if (!result.success || !result.data) {
+      setGpsError('Error al crear el recorrido: ' + result.error);
+      setIsSaving(false);
+      return;
+    }
+
+    setActiveRecorridoId(result.data.id);
+    setRouteCoords([]);
+    setIsSaving(false);
+    setIsTracking(true);
+
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newCoord = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserPosition([newCoord.lat, newCoord.lng]);
+        setRouteCoords(prev => {
+          if (prev.length === 0) return [newCoord];
+          const last = prev[prev.length - 1];
+          if (haversineDistance(last, newCoord) < MIN_DISTANCE_METERS) return prev;
+          return [...prev, newCoord];
+        });
+      },
+      (err) => {
+        setGpsError(err.code === 1 ? 'Permiso de ubicación denegado. Activa el GPS.' : 'Error de GPS: ' + err.message);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+    watchIdRef.current = id;
+  }, [zoneName]);
+
+  // Stop GPS tracking
+  const stopTracking = useCallback(async () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+
+    if (activeRecorridoId && routeCoords.length > 0) {
+      setIsSaving(true);
+      await propertyService.finishRecorrido(activeRecorridoId, routeCoords, currentDistance);
+      setIsSaving(false);
+      setActiveRecorridoId(null);
+      setRouteCoords([]);
+      setZoneName('');
+      loadData();
+    }
+  }, [activeRecorridoId, routeCoords, currentDistance]);
+
+  // Save a captacion
+  const saveCaptacion = async () => {
+    if (!userPosition) { setGpsError('No se pudo obtener tu ubicación GPS.'); return; }
+    setIsSaving(true);
+    await propertyService.createCaptacion({
+      recorrido_id: activeRecorridoId,
+      latitud: userPosition[0],
+      longitud: userPosition[1],
+      ...captureForm
+    });
+    setIsSaving(false);
+    setShowCapture(false);
+    setCaptureForm({ tipo_inmueble: 'Casa', estatus: 'Se Vende', telefono_contacto: '', notas: '' });
+    loadData();
+  };
+
+  // Delete a recorrido
+  const handleDeleteRecorrido = async (id: string) => {
+    if (!confirm('¿Eliminar este recorrido y todas sus captaciones?')) return;
+    await propertyService.deleteRecorrido(id);
+    loadData();
+  };
+
+  const todayRecorridos = recorridos.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString());
+  const totalDistance = recorridos.reduce((s, r) => s + (r.distancia_metros || 0), 0);
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-500">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-serif font-bold text-slate-900 flex items-center gap-3">
+            <Navigation className="w-8 h-8 text-emerald-600" />
+            Farming Inmobiliario
+          </h2>
+          <p className="text-slate-500 mt-1 text-lg">Peinado de zonas con GPS en tiempo real</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-2xl text-center">
+            <p className="text-2xl font-black text-emerald-700">{todayRecorridos.length}</p>
+            <p className="text-[10px] font-bold text-emerald-500 uppercase">Recorridos Hoy</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-2xl text-center">
+            <p className="text-2xl font-black text-blue-700">{captaciones.length}</p>
+            <p className="text-[10px] font-bold text-blue-500 uppercase">Captaciones</p>
+          </div>
+          <div className="bg-purple-50 border border-purple-200 px-4 py-2 rounded-2xl text-center">
+            <p className="text-2xl font-black text-purple-700">{formatDistance(totalDistance)}</p>
+            <p className="text-[10px] font-bold text-purple-500 uppercase">Total Recorrido</p>
+          </div>
+        </div>
+      </div>
+
+      {/* GPS Error Banner */}
+      {gpsError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm font-medium flex items-center gap-2">
+          <MapPin className="w-5 h-5 flex-shrink-0" /> {gpsError}
+        </div>
+      )}
+
+      {/* Map + Controls */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Zone name input (when not tracking) */}
+        {!isTracking && (
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <MapPin className="w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              value={zoneName}
+              onChange={e => setZoneName(e.target.value)}
+              placeholder="Nombre de la zona a recorrer (Ej: Sector La Lago)..."
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
+          </div>
+        )}
+
+        {/* Tracking status bar */}
+        {isTracking && (
+          <div className="px-4 py-3 border-b border-emerald-200 bg-emerald-50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-sm font-bold text-emerald-800">
+                Recorriendo: {zoneName || 'Sin nombre'}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-bold text-emerald-600">
+              <span>{routeCoords.length} puntos</span>
+              <span>{formatDistance(currentDistance)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Map */}
+        <div style={{ height: '55vh', minHeight: 350 }}>
+          <MapContainer
+            center={MARACAIBO_CENTER}
+            zoom={14}
+            style={{ height: '100%', width: '100%' }}
+            zoomControl={false}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <RecenterMap position={isTracking ? userPosition : null} />
+
+            {/* Past routes (gray) */}
+            {recorridos.map(r => r.coordenadas_ruta && r.coordenadas_ruta.length > 1 && (
+              <Polyline
+                key={r.id}
+                positions={r.coordenadas_ruta.map(c => [c.lat, c.lng] as [number, number])}
+                pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '8 6' }}
+              />
+            ))}
+
+            {/* Active route (green) */}
+            {routeCoords.length > 1 && (
+              <Polyline
+                positions={routeCoords.map(c => [c.lat, c.lng] as [number, number])}
+                pathOptions={{ color: '#10b981', weight: 5, opacity: 0.9 }}
+              />
+            )}
+
+            {/* User position marker */}
+            {userPosition && isTracking && (
+              <Marker position={userPosition} icon={new L.DivIcon({
+                className: '',
+                html: `<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,.2), 0 2px 6px rgba(0,0,0,.3);"></div>`,
+                iconSize: [18, 18], iconAnchor: [9, 9]
+              })} />
+            )}
+
+            {/* Captacion markers */}
+            {captaciones.map(c => (
+              <Marker key={c.id} position={[c.latitud, c.longitud]} icon={captacionIcon}>
+                <Popup>
+                  <div className="text-xs space-y-1 min-w-[160px]">
+                    <p className="font-bold text-slate-900">{c.tipo_inmueble}</p>
+                    <p className="text-emerald-600 font-semibold">{c.estatus}</p>
+                    {c.telefono_contacto && <p>📞 {c.telefono_contacto}</p>}
+                    {c.notas && <p className="text-slate-500 italic">{c.notas}</p>}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
+
+        {/* Control buttons */}
+        <div className="px-4 py-4 border-t border-slate-100 flex items-center gap-3">
+          {!isTracking ? (
+            <button
+              onClick={startTracking}
+              disabled={isSaving}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-3"
+            >
+              <Play className="w-6 h-6" /> {isSaving ? 'Iniciando...' : 'Iniciar Recorrido'}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={stopTracking}
+                disabled={isSaving}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-red-600/20 active:scale-95 flex items-center justify-center gap-3"
+              >
+                <Square className="w-6 h-6" /> {isSaving ? 'Guardando...' : 'Detener'}
+              </button>
+              <button
+                onClick={() => setShowCapture(true)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-600/20 active:scale-95 flex items-center justify-center gap-3"
+              >
+                <Plus className="w-6 h-6" /> Añadir Inmueble
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-colors"
+            title="Historial"
+          >
+            <Clock className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      {/* History Panel */}
+      {showHistory && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Route className="w-5 h-5 text-slate-400" /> Historial de Recorridos
+          </h3>
+          {recorridos.length === 0 ? (
+            <p className="text-sm text-slate-400 italic py-6 text-center">No hay recorridos registrados aún.</p>
+          ) : (
+            <div className="space-y-3">
+              {recorridos.map(r => {
+                const rCaptaciones = captaciones.filter(c => c.recorrido_id === r.id);
+                return (
+                  <div key={r.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 truncate">{r.zona_nombre}</p>
+                      <p className="text-xs text-slate-500">
+                        {r.agente_email?.split('@')[0]} · {new Date(r.created_at).toLocaleDateString()} · {formatDistance(r.distancia_metros)} · {rCaptaciones.length} captaciones
+                      </p>
+                    </div>
+                    <button onClick={() => handleDeleteRecorrido(r.id)} className="p-2 hover:bg-red-50 rounded-full text-red-400 hover:text-red-600 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Capture Modal */}
+      {showCapture && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white w-full md:max-w-md md:rounded-3xl rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600" /> Captura Rápida
+              </h3>
+              <button onClick={() => setShowCapture(false)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Tipo de Inmueble</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['Casa', 'Apartamento', 'Local', 'Terreno'].map(t => (
+                    <button key={t} onClick={() => setCaptureForm({...captureForm, tipo_inmueble: t})}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all ${captureForm.tipo_inmueble === t ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >{t}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Estatus</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['Se Vende', 'Se Alquila', 'Potencial'].map(s => (
+                    <button key={s} onClick={() => setCaptureForm({...captureForm, estatus: s})}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all ${captureForm.estatus === s ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >{s}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Teléfono de Contacto</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="tel" value={captureForm.telefono_contacto} onChange={e => setCaptureForm({...captureForm, telefono_contacto: e.target.value})}
+                    placeholder="0424-1234567" className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-2">Notas</label>
+                <div className="relative">
+                  <FileText className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
+                  <textarea value={captureForm.notas} onChange={e => setCaptureForm({...captureForm, notas: e.target.value})}
+                    placeholder="Detalles del inmueble..." rows={2} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none" />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100">
+              <button onClick={saveCaptacion} disabled={isSaving}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-4 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                {isSaving ? 'Guardando...' : '📌 Guardar Captación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
