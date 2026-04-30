@@ -10,9 +10,9 @@ export interface GridCell {
 export function generateMaracaiboGrid(): GridCell[] {
   const grid: GridCell[] = [];
   
-  const startLat = 10.5400; // Sur (San Francisco)
-  const endLat = 10.7400;   // Norte (Maracaibo Norte)
-  const startLng = -71.6900; // Oeste
+  const startLat = 10.5000; // Sur (Más al sur en San Francisco)
+  const endLat = 10.7700;   // Norte (Más al norte en Maracaibo Norte)
+  const startLng = -71.7900; // Oeste (Incluir Ancón Alto, San Isidro, etc)
   const endLng = -71.5700;   // Este (Lago)
 
   const stepLat = 0.014; // ~1.55 km

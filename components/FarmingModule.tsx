@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame } from 'lucide-react';
+import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { propertyService } from '../services/supabase';
