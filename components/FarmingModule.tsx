@@ -344,7 +344,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
       {/* Grid Assignment Modal */}
       {pendingGridCell && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Target className="w-5 h-5 text-emerald-600" /> Asignar Zona</h3>
@@ -416,7 +416,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
       {/* Capture Modal */}
       {showCapture && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-white w-full md:max-w-md md:rounded-3xl rounded-t-3xl shadow-2xl">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2"><MapPin className="w-5 h-5 text-emerald-600" /> Captura Rápida</h3>
