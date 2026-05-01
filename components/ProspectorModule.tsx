@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Globe, AlertTriangle, User, Building, MapPin, Tag, Filter, ExternalLink } from 'lucide-react';
+import { Search, Globe, AlertTriangle, User, Building, MapPin, Tag, Filter, ExternalLink, BedDouble, Bath, ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { MARACAIBO_SECTORS } from '../constants/locations';
 
@@ -19,6 +19,9 @@ export default function ProspectorModule() {
         operacion: 'Venta',
         tipoInmueble: '',
         ubicacion: '',
+        customUbicacion: '',
+        habitaciones: '',
+        banos: '',
         keywords: '',
         fuente: '',
         soloDuenos: true
@@ -44,8 +47,19 @@ export default function ProspectorModule() {
         setResults([]);
 
         let queryParts = [`${formData.operacion} ${formData.tipoInmueble}`];
-        if (formData.ubicacion) queryParts.push(formData.ubicacion);
+        
+        // Location: use custom if "Otro", otherwise use dropdown value
+        const ubicacionFinal = formData.ubicacion === 'Otro' ? formData.customUbicacion : formData.ubicacion;
+        if (ubicacionFinal) queryParts.push(ubicacionFinal);
+        
         queryParts.push("Maracaibo");
+        
+        // Room count
+        if (formData.habitaciones) queryParts.push(`${formData.habitaciones} habitaciones`);
+        
+        // Bathroom count
+        if (formData.banos) queryParts.push(`${formData.banos} baños`);
+        
         if (formData.soloDuenos) queryParts.push(`"dueño" OR "directo"`);
         if (formData.keywords) queryParts.push(formData.keywords);
         if (formData.fuente) queryParts.push(`site:${formData.fuente}`);
@@ -103,16 +117,17 @@ export default function ProspectorModule() {
                 </div>
             </div>
 
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div>
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-5">
+                {/* Row 1: Operación, Tipo, Sector */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="md:col-span-2">
                         <label className="block text-sm font-bold text-slate-700 mb-2">Operación</label>
                         <select name="operacion" value={formData.operacion} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
                             <option value="Venta">Venta</option>
                             <option value="Alquiler">Alquiler</option>
                         </select>
                     </div>
-                    <div>
+                    <div className="md:col-span-3">
                         <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Inmueble</label>
                         <select name="tipoInmueble" value={formData.tipoInmueble} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
                             <option value="" disabled>Seleccionar...</option>
@@ -125,41 +140,94 @@ export default function ProspectorModule() {
                             <option value="Terreno">Terreno</option>
                         </select>
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-4">
                         <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-400"/>Sector / Zona</label>
                         <select name="ubicacion" value={formData.ubicacion} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
                             <option value="">Cualquier sector (Búsqueda amplia)</option>
                             {MARACAIBO_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                            <option value="Otro">📍 Otro sector...</option>
                         </select>
+                    </div>
+                    <div className="md:col-span-3">
+                        {formData.ubicacion === 'Otro' ? (
+                            <>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><MapPin className="w-4 h-4 text-indigo-400"/>Zona personalizada</label>
+                                <input
+                                    name="customUbicacion"
+                                    value={formData.customUbicacion}
+                                    onChange={handleChange}
+                                    placeholder="Ej: Zona Norte, 5 de Julio..."
+                                    className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium placeholder:text-slate-400"
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-400"/>Zona adicional</label>
+                                <input
+                                    name="customUbicacion"
+                                    value={formData.customUbicacion}
+                                    onChange={handleChange}
+                                    placeholder="Refinar zona (opcional)..."
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium placeholder:text-slate-400"
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row items-center gap-4">
-                    <div className="flex-1 w-full relative">
-                        <Tag className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                {/* Row 2: Habitaciones, Baños, Keywords, Portal */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><BedDouble className="w-4 h-4 text-slate-400"/>Habitaciones</label>
+                        <select name="habitaciones" value={formData.habitaciones} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
+                            <option value="">Cualquiera</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5+">5+</option>
+                        </select>
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Bath className="w-4 h-4 text-slate-400"/>Baños</label>
+                        <select name="banos" value={formData.banos} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
+                            <option value="">Cualquiera</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4+">4+</option>
+                        </select>
+                    </div>
+                    <div className="md:col-span-4">
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Tag className="w-4 h-4 text-slate-400"/>Palabras clave</label>
                         <input
                             type="text"
                             name="keywords"
                             value={formData.keywords}
                             onChange={handleChange}
-                            placeholder="Palabras clave extra (Ej: amoblado)..."
-                            className="w-full pl-12 pr-4 py-3.5 text-md border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                            placeholder="Ej: amoblado, piscina, planta..."
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                         />
                     </div>
-                    <div className="flex-1 w-full relative">
+                    <div className="md:col-span-4">
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Globe className="w-4 h-4 text-slate-400"/>Portal / Fuente</label>
                         <select 
                             name="fuente" 
                             value={formData.fuente} 
                             onChange={handleChange} 
-                            className="w-full px-4 py-3.5 text-md border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none"
                         >
-                            <option value="">Cualquier Portal (Búsqueda General)</option>
+                            <option value="">Cualquier Portal</option>
                             <option value="instagram.com">Instagram</option>
                             <option value="facebook.com">Facebook / Marketplace</option>
                             <option value="mercadolibre.com.ve">MercadoLibre Inmuebles</option>
                             <option value="tiktok.com">TikTok</option>
                         </select>
                     </div>
+                </div>
+
+                {/* Row 3: Actions */}
+                <div className="flex flex-col md:flex-row items-center gap-4 pt-2 border-t border-slate-100">
                     <label className="flex items-center gap-3 cursor-pointer shrink-0 bg-indigo-50 px-4 py-3.5 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors">
                         <input type="checkbox" name="soloDuenos" checked={formData.soloDuenos} onChange={handleChange} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500/20" />
                         <span className="font-bold text-indigo-900 text-sm flex flex-col">Modo Francotirador <span className="text-xs font-medium text-indigo-500">Solo dueños directos</span></span>
@@ -167,17 +235,17 @@ export default function ProspectorModule() {
                     <button
                         onClick={processSearch}
                         disabled={loading || !formData.tipoInmueble}
-                        className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
+                        className="w-full md:flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
                     >
                         {loading ? (
                             <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Escaneo Profundo (~15s)...</>
                         ) : (
-                            <><Search className="w-5 h-5" /> Buscar</>
+                            <><Search className="w-5 h-5" /> Buscar Prospectos</>
                         )}
                     </button>
                 </div>
                 {error && (
-                    <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3">
+                    <div className="mt-2 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3">
                         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                         <span className="font-medium text-sm">{error}</span>
                     </div>
