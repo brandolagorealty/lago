@@ -913,13 +913,13 @@ export const propertyService = {
   },
 
   // Get all recorridos (visible to all team)
-  async getRecorridos(): Promise<any[]> {
+  async getRecorridos(): Promise<import('../types').Recorrido[]> {
     if (!supabase) return [];
     const { data, error } = await supabase.from('recorridos')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) { console.error('Error fetching recorridos:', error); return []; }
-    return data || [];
+    return (data || []) as import('../types').Recorrido[];
   },
 
   // Delete a recorrido
@@ -945,13 +945,13 @@ export const propertyService = {
   },
 
   // Get captaciones (optionally filtered by recorrido)
-  async getCaptaciones(recorridoId?: string): Promise<any[]> {
+  async getCaptaciones(recorridoId?: string): Promise<import('../types').Captacion[]> {
     if (!supabase) return [];
     let query = supabase.from('captaciones').select('*').order('created_at', { ascending: false });
     if (recorridoId) query = query.eq('recorrido_id', recorridoId);
     const { data, error } = await query;
     if (error) { console.error('Error fetching captaciones:', error); return []; }
-    return data || [];
+    return (data || []) as import('../types').Captacion[];
   },
 
   // Delete a captacion
@@ -963,11 +963,11 @@ export const propertyService = {
   },
 
   // Farming Zones CRUD
-  async getZonasFarming(): Promise<any[]> {
+  async getZonasFarming(): Promise<import('../types').ZonaFarming[]> {
     if (!supabase) return [];
     const { data, error } = await supabase.from('zonas_farming').select('*').order('created_at', { ascending: false });
     if (error) { console.error('Error fetching zonas:', error); return []; }
-    return data || [];
+    return (data || []) as import('../types').ZonaFarming[];
   },
 
   async createZonaFarming(zona: any): Promise<{ success: boolean; error?: string }> {

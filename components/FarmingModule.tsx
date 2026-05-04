@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target, Star, ChevronDown, ChevronRight, ClipboardList, BookOpen, Users } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -33,6 +33,16 @@ const captacionIcon = new L.DivIcon({
   html: `<div style="background:#10b981;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
   iconSize: [28, 28], iconAnchor: [14, 14],
 });
+
+const userPositionIcon = new L.DivIcon({
+  className: '',
+  html: `<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,.2)"></div>`,
+  iconSize: [18, 18], iconAnchor: [9, 9],
+});
+
+const DEFAULT_REPORT: ReporteInteligencia = { carteles_duenos: '0', carteles_competencia: '0', inmuebles_abandonados: '0', contactos_clave: '0', tarjetas_entregadas: '0', actividad_construccion: 'Nula', receptividad: 'Indiferente', potencial_captacion: 3, notas: '' };
+
+const COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#a855f7', '#ef4444', '#64748b', '#0ea5e9'];
 
 function haversineDistance(a: {lat:number;lng:number}, b: {lat:number;lng:number}): number {
   const R = 6371000;
@@ -69,6 +79,105 @@ function HeatmapLayer({ points }: { points: [number, number][] }) {
 }
 
 
+
+interface BitacoraSectionProps {
+  recorridos: Recorrido[];
+  isAdmin: boolean;
+  currentUserId: string | undefined;
+  bitacoraFilter: string;
+  setBitacoraFilter: (v: string) => void;
+  expandedZones: Record<string, boolean>;
+  setExpandedZones: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}
+
+function BitacoraSection({ recorridos, isAdmin, currentUserId, bitacoraFilter, setBitacoraFilter, expandedZones, setExpandedZones }: BitacoraSectionProps) {
+  const filteredRecs = isAdmin && bitacoraFilter !== 'all'
+    ? recorridos.filter(r => r.agente_id === bitacoraFilter)
+    : isAdmin ? recorridos : recorridos.filter(r => r.agente_id === currentUserId);
+
+  const grouped = filteredRecs.reduce<Record<string, Recorrido[]>>((acc, r) => {
+    const key = r.zona_nombre || 'Sin nombre';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(r);
+    return acc;
+  }, {});
+
+  const uniqueAgents = Array.from(new Set(recorridos.map(r => r.agente_id).filter(Boolean)));
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><BookOpen className="w-5 h-5 text-amber-500" /> Mi Bitácora de Farming</h3>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-slate-400" />
+            <select value={bitacoraFilter} onChange={e => setBitacoraFilter(e.target.value)} className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
+              <option value="all">Todos los asesores</option>
+              {uniqueAgents.map(id => {
+                const email = recorridos.find(r => r.agente_id === id)?.agente_email || id;
+                return <option key={id} value={id!}>{email?.split('@')[0]}</option>;
+              })}
+            </select>
+          </div>
+        )}
+      </div>
+      {Object.keys(grouped).length === 0 ? (
+        <p className="text-sm text-slate-400 italic text-center py-6">Sin recorridos registrados.</p>
+      ) : (
+        <div className="space-y-3">
+          {Object.entries(grouped).map(([zona, recs]) => {
+            const totalKm = recs.reduce((s, r) => s + (r.distancia_metros || 0), 0);
+            const recsWithReport = recs.filter(r => r.reporte);
+            const avgPotencial = recsWithReport.length > 0 ? Math.round(recsWithReport.reduce((s, r) => s + (r.reporte?.potencial_captacion || 0), 0) / recsWithReport.length) : 0;
+            const lastRec = recs[0];
+            const daysSince = Math.floor((Date.now() - new Date(lastRec.created_at).getTime()) / 86400000);
+            const isExpanded = expandedZones[zona] || false;
+
+            return (
+              <div key={zona} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                <button onClick={() => setExpandedZones(prev => ({...prev, [zona]: !prev[zona]}))} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-100 transition-colors text-left">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-900 truncate">📍 {zona}</p>
+                    <p className="text-xs text-slate-500">{recs.length} recorrido{recs.length !== 1 ? 's' : ''} · Último: {daysSince === 0 ? 'hoy' : `hace ${daysSince}d`} · {formatDistance(totalKm)}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {avgPotencial > 0 && <div className="flex">{[1,2,3,4,5].map(n => <Star key={n} className={`w-3.5 h-3.5 ${n <= avgPotencial ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />)}</div>}
+                    {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="px-4 pb-3 space-y-2 border-t border-slate-200">
+                    {recs.map(r => (
+                      <div key={r.id} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
+                        <div className="text-xs text-slate-400 pt-0.5 w-20 shrink-0 font-medium">{new Date(r.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-700">{formatDistance(r.distancia_metros)}</span>
+                            {r.reporte && <div className="flex">{[1,2,3,4,5].map(n => <Star key={n} className={`w-3 h-3 ${n <= (r.reporte?.potencial_captacion || 0) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />)}</div>}
+                            {isAdmin && r.agente_email && <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{r.agente_email.split('@')[0]}</span>}
+                          </div>
+                          {r.reporte && (
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {r.reporte.carteles_duenos !== '0' && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">🏠 {r.reporte.carteles_duenos}</span>}
+                              {r.reporte.contactos_clave !== '0' && <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-md font-bold">🤝 {r.reporte.contactos_clave}</span>}
+                              {r.reporte.receptividad !== 'Indiferente' && <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${r.reporte.receptividad === 'Receptiva' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{r.reporte.receptividad === 'Receptiva' ? '😊' : '😠'} {r.reporte.receptividad}</span>}
+                            </div>
+                          )}
+                          {r.reporte?.notas && <p className="text-xs text-slate-500 italic mt-1 truncate">"{r.reporte.notas}"</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface FarmingProps {
   currentUserRole: 'superadmin' | 'asesor' | null;
@@ -107,8 +216,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
   // Intelligence Report state
   const [showReportModal, setShowReportModal] = useState(false);
-  const defaultReport: ReporteInteligencia = { carteles_duenos: '0', carteles_competencia: '0', inmuebles_abandonados: '0', contactos_clave: '0', tarjetas_entregadas: '0', actividad_construccion: 'Nula', receptividad: 'Indiferente', potencial_captacion: 3, notas: '' };
-  const [reportForm, setReportForm] = useState<ReporteInteligencia>({ ...defaultReport });
+  const [reportForm, setReportForm] = useState<ReporteInteligencia>({ ...DEFAULT_REPORT });
 
   // Bitácora state
   const [showBitacora, setShowBitacora] = useState(false);
@@ -116,6 +224,16 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [bitacoraFilter, setBitacoraFilter] = useState<string>('all');
 
   useEffect(() => { loadData(); }, []);
+
+  // Cleanup GPS watch on unmount to prevent battery drain / memory leak
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -126,7 +244,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     setIsLoading(false);
   };
 
-  const currentDistance = routeCoords.reduce((sum, c, i) => i === 0 ? 0 : sum + haversineDistance(routeCoords[i-1], c), 0);
+  const currentDistance = useMemo(() => routeCoords.reduce((sum, c, i) => i === 0 ? 0 : sum + haversineDistance(routeCoords[i-1], c), 0), [routeCoords]);
 
   // GPS tracking
   const startTracking = useCallback(async () => {
@@ -156,7 +274,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     setIsTracking(false);
     if (activeRecorridoId && routeCoords.length > 0) {
       // Open the intelligence report modal instead of saving immediately
-      setReportForm({ ...defaultReport });
+      setReportForm({ ...DEFAULT_REPORT });
       setShowReportModal(true);
     }
   }, [activeRecorridoId, routeCoords, currentDistance]);
@@ -164,11 +282,21 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const submitReport = async () => {
     if (!activeRecorridoId) return;
     setIsSaving(true);
-    await propertyService.finishRecorrido(activeRecorridoId, routeCoords, currentDistance, reportForm);
-    setIsSaving(false);
-    setShowReportModal(false);
-    setActiveRecorridoId(null); setRouteCoords([]); setZoneName('');
-    loadData();
+    try {
+      const result = await propertyService.finishRecorrido(activeRecorridoId, routeCoords, currentDistance, reportForm);
+      if (!result.success) {
+        setGpsError('Error al guardar reporte: ' + (result.error || 'Desconocido'));
+        setIsSaving(false);
+        return;
+      }
+      setShowReportModal(false);
+      setActiveRecorridoId(null); setRouteCoords([]); setZoneName('');
+      loadData();
+    } catch (err: any) {
+      setGpsError('Error al guardar reporte: ' + (err.message || 'Error de conexión'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const saveCaptacion = async () => {
@@ -187,11 +315,11 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
 
 
-  // Heatmap points from all recorridos
-  const heatPoints: [number,number][] = recorridos.flatMap(r => (r.coordenadas_ruta || []).map((c: any) => [c.lat, c.lng] as [number,number]));
+  // Heatmap points from all recorridos (memoized)
+  const heatPoints = useMemo<[number,number][]>(() => recorridos.flatMap(r => (r.coordenadas_ruta || []).map((c: any) => [c.lat, c.lng] as [number,number])), [recorridos]);
 
-  const todayRecs = recorridos.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString());
-  const totalDist = recorridos.reduce((s, r) => s + (r.distancia_metros || 0), 0);
+  const todayRecs = useMemo(() => recorridos.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString()), [recorridos]);
+  const totalDist = useMemo(() => recorridos.reduce((s, r) => s + (r.distancia_metros || 0), 0), [recorridos]);
 
   // Zone color based on progress
   const getZoneOpacity = (z: ZonaFarming) => {
@@ -204,16 +332,14 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
   // Generate and filter grid cells
   const baseGrid = React.useMemo(() => generateMaracaiboGrid(), []);
-  const availableGrid = baseGrid.filter(cell => {
+  const availableGrid = useMemo(() => baseGrid.filter(cell => {
     if (!cell.poligono || cell.poligono.length === 0) return false;
     return !zonas.some(z => 
       z.poligono && z.poligono.length > 0 &&
       Math.abs(z.poligono[0].lat - cell.poligono[0].lat) < 0.001 &&
       Math.abs(z.poligono[0].lng - cell.poligono[0].lng) < 0.001
     );
-  });
-
-  const COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#a855f7', '#ef4444', '#64748b', '#0ea5e9'];
+  }), [baseGrid, zonas]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-500">
@@ -223,7 +349,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
           <h2 className="text-3xl font-serif font-bold text-slate-900 flex items-center gap-3">
             <Navigation className="w-8 h-8 text-emerald-600" /> Farming Inmobiliario
           </h2>
-          <p className="text-slate-500 mt-1">Peinado de zonas con GPS · Maracaibo y San Francisco</p>
+          <p className="text-slate-500 mt-1">Peinado de zonas con GPS · Costa Occidental y Oriental del Lago</p>
         </div>
         <div className="flex gap-3 flex-wrap">
           <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-2xl text-center">
@@ -290,8 +416,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 </Polygon>
               ))}
 
-              {/* Past routes */}
-              {recorridos.map(r => r.coordenadas_ruta && r.coordenadas_ruta.length > 1 && (
+              {/* Past routes — only rendered when history is toggled to avoid 100s of polylines */}
+              {showHistory && recorridos.map(r => r.coordenadas_ruta && r.coordenadas_ruta.length > 1 && (
                 <Polyline key={r.id} positions={r.coordenadas_ruta.map((c: any) => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '8 6' }} />
               ))}
 
@@ -299,7 +425,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
               {routeCoords.length > 1 && <Polyline positions={routeCoords.map(c => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#10b981', weight: 5, opacity: 0.9 }} />}
 
               {/* User position */}
-              {userPosition && isTracking && <Marker position={userPosition} icon={new L.DivIcon({ className: '', html: `<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,.2)"></div>`, iconSize: [18,18], iconAnchor: [9,9] })} />}
+              {userPosition && isTracking && <Marker position={userPosition} icon={userPositionIcon} />}
 
               {/* Captacion markers */}
               {captaciones.map(c => (
@@ -357,7 +483,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                   <p className="font-bold text-slate-900 truncate">{r.zona_nombre}</p>
                   <p className="text-xs text-slate-500">{r.agente_email?.split('@')[0]} · {new Date(r.created_at).toLocaleDateString()} · {formatDistance(r.distancia_metros)}</p>
                 </div>
-                {(isAdmin || true) && <button onClick={() => handleDeleteRecorrido(r.id)} className="p-2 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
+                {(isAdmin || r.agente_id === currentUserId) && <button onClick={() => handleDeleteRecorrido(r.id)} className="p-2 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}</div>
           )}
@@ -561,94 +687,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
       )}
 
       {/* Bitácora Personal */}
-      {showBitacora && (() => {
-        const filteredRecs = isAdmin && bitacoraFilter !== 'all'
-          ? recorridos.filter(r => r.agente_id === bitacoraFilter)
-          : isAdmin ? recorridos : recorridos.filter(r => r.agente_id === currentUserId);
-
-        const grouped = filteredRecs.reduce<Record<string, Recorrido[]>>((acc, r) => {
-          const key = r.zona_nombre || 'Sin nombre';
-          if (!acc[key]) acc[key] = [];
-          acc[key].push(r);
-          return acc;
-        }, {});
-
-        const uniqueAgents = Array.from(new Set(recorridos.map(r => r.agente_id).filter(Boolean)));
-
-        return (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><BookOpen className="w-5 h-5 text-amber-500" /> Mi Bitácora de Farming</h3>
-              {isAdmin && (
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-slate-400" />
-                  <select value={bitacoraFilter} onChange={e => setBitacoraFilter(e.target.value)} className="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none">
-                    <option value="all">Todos los asesores</option>
-                    {uniqueAgents.map(id => {
-                      const email = recorridos.find(r => r.agente_id === id)?.agente_email || id;
-                      return <option key={id} value={id!}>{email?.split('@')[0]}</option>;
-                    })}
-                  </select>
-                </div>
-              )}
-            </div>
-            {Object.keys(grouped).length === 0 ? (
-              <p className="text-sm text-slate-400 italic text-center py-6">Sin recorridos registrados.</p>
-            ) : (
-              <div className="space-y-3">
-                {Object.entries(grouped).map(([zona, recs]) => {
-                  const totalKm = recs.reduce((s, r) => s + (r.distancia_metros || 0), 0);
-                  const recsWithReport = recs.filter(r => r.reporte);
-                  const avgPotencial = recsWithReport.length > 0 ? Math.round(recsWithReport.reduce((s, r) => s + (r.reporte?.potencial_captacion || 0), 0) / recsWithReport.length) : 0;
-                  const lastRec = recs[0];
-                  const daysSince = Math.floor((Date.now() - new Date(lastRec.created_at).getTime()) / 86400000);
-                  const isExpanded = expandedZones[zona] || false;
-
-                  return (
-                    <div key={zona} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
-                      <button onClick={() => setExpandedZones(prev => ({...prev, [zona]: !prev[zona]}))} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-100 transition-colors text-left">
-                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><MapPin className="w-5 h-5" /></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-900 truncate">📍 {zona}</p>
-                          <p className="text-xs text-slate-500">{recs.length} recorrido{recs.length !== 1 ? 's' : ''} · Último: {daysSince === 0 ? 'hoy' : `hace ${daysSince}d`} · {formatDistance(totalKm)}</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {avgPotencial > 0 && <div className="flex">{[1,2,3,4,5].map(n => <Star key={n} className={`w-3.5 h-3.5 ${n <= avgPotencial ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />)}</div>}
-                          {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
-                        </div>
-                      </button>
-                      {isExpanded && (
-                        <div className="px-4 pb-3 space-y-2 border-t border-slate-200">
-                          {recs.map(r => (
-                            <div key={r.id} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
-                              <div className="text-xs text-slate-400 pt-0.5 w-20 shrink-0 font-medium">{new Date(r.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-bold text-slate-700">{formatDistance(r.distancia_metros)}</span>
-                                  {r.reporte && <div className="flex">{[1,2,3,4,5].map(n => <Star key={n} className={`w-3 h-3 ${n <= (r.reporte?.potencial_captacion || 0) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />)}</div>}
-                                  {isAdmin && r.agente_email && <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{r.agente_email.split('@')[0]}</span>}
-                                </div>
-                                {r.reporte && (
-                                  <div className="mt-1 flex flex-wrap gap-1.5">
-                                    {r.reporte.carteles_duenos !== '0' && <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">🏠 {r.reporte.carteles_duenos}</span>}
-                                    {r.reporte.contactos_clave !== '0' && <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-md font-bold">🤝 {r.reporte.contactos_clave}</span>}
-                                    {r.reporte.receptividad !== 'Indiferente' && <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${r.reporte.receptividad === 'Receptiva' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{r.reporte.receptividad === 'Receptiva' ? '😊' : '😠'} {r.reporte.receptividad}</span>}
-                                  </div>
-                                )}
-                                {r.reporte?.notas && <p className="text-xs text-slate-500 italic mt-1 truncate">"{r.reporte.notas}"</p>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {showBitacora && <BitacoraSection recorridos={recorridos} isAdmin={isAdmin} currentUserId={currentUserId} bitacoraFilter={bitacoraFilter} setBitacoraFilter={setBitacoraFilter} expandedZones={expandedZones} setExpandedZones={setExpandedZones} />}
     </div>
   );
 }
