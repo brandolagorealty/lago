@@ -100,19 +100,23 @@ function calculateBearing(from: [number,number], to: [number,number]): number {
 }
 
 function createUserIcon(heading: number | null): L.DivIcon {
-  const arrow = heading !== null
-    ? `<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(${heading}deg);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #3b82f6;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));z-index:3;"></div>`
+  const cone = heading !== null
+    ? `<div style="position:absolute;top:50%;left:50%;width:40px;height:40px;transform:translate(-50%,-50%) rotate(${heading}deg);pointer-events:none;">
+        <svg width="40" height="40" viewBox="0 0 40 40" style="overflow:visible;">
+          <path d="M20 20 L12 3 Q20 -1 28 3 Z" fill="rgba(59,130,246,0.22)"/>
+        </svg>
+      </div>`
     : '';
   return new L.DivIcon({
     className: '',
     html: `<style>@keyframes farmPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.5}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}</style>
-    <div style="position:relative;width:24px;height:24px;">
-      ${arrow}
+    <div style="position:relative;width:40px;height:40px;">
+      ${cone}
       <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(59,130,246,.5);z-index:2;"></div>
       <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:rgba(59,130,246,.35);border-radius:50%;animation:farmPulse 2s ease-out infinite;"></div>
       <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:rgba(59,130,246,.2);border-radius:50%;animation:farmPulse 2s ease-out .8s infinite;"></div>
     </div>`,
-    iconSize: [24, 24], iconAnchor: [12, 12],
+    iconSize: [40, 40], iconAnchor: [20, 20],
   });
 }
 
