@@ -90,6 +90,32 @@ function getCentroid(poligono: {lat:number;lng:number}[]): [number,number] {
   return [lat, lng];
 }
 
+function calculateBearing(from: [number,number], to: [number,number]): number {
+  const dLng = (to[1] - from[1]) * Math.PI / 180;
+  const lat1 = from[0] * Math.PI / 180;
+  const lat2 = to[0] * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
+
+function createUserIcon(heading: number | null): L.DivIcon {
+  const arrow = heading !== null
+    ? `<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(${heading}deg);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #3b82f6;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));z-index:3;"></div>`
+    : '';
+  return new L.DivIcon({
+    className: '',
+    html: `<style>@keyframes farmPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.5}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}</style>
+    <div style="position:relative;width:24px;height:24px;">
+      ${arrow}
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(59,130,246,.5);z-index:2;"></div>
+      <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:rgba(59,130,246,.35);border-radius:50%;animation:farmPulse 2s ease-out infinite;"></div>
+      <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:rgba(59,130,246,.2);border-radius:50%;animation:farmPulse 2s ease-out .8s infinite;"></div>
+    </div>`,
+    iconSize: [24, 24], iconAnchor: [12, 12],
+  });
+}
+
 async function fetchOSRMRoute(from: [number,number], to: [number,number]): Promise<{coords: [number,number][], distance: number, duration: number} | null> {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
@@ -286,6 +312,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [navTarget, setNavTarget] = useState<ZonaFarming | null>(null);
   const [hasArrived, setHasArrived] = useState(false);
   const [centerTrigger, setCenterTrigger] = useState(0);
+  const [userHeading, setUserHeading] = useState<number | null>(null);
+  const lastPosRef = useRef<[number,number] | null>(null);
   const navWatchRef = useRef<number | null>(null);
   const rerouteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -347,17 +375,21 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
         // Start continuous GPS watch for navigation
         const wid = navigator.geolocation.watchPosition(
           (p) => {
-            setUserPosition([p.coords.latitude, p.coords.longitude]);
+            const newPos: [number,number] = [p.coords.latitude, p.coords.longitude];
+            setUserPosition(newPos);
+            // Update heading from GPS or calculated
+            if (p.coords.heading != null && !isNaN(p.coords.heading)) {
+              setUserHeading(p.coords.heading);
+            } else if (lastPosRef.current) {
+              const d = haversineDistance({lat: lastPosRef.current[0], lng: lastPosRef.current[1]}, {lat: newPos[0], lng: newPos[1]});
+              if (d > 5) setUserHeading(calculateBearing(lastPosRef.current, newPos));
+            }
+            lastPosRef.current = newPos;
           },
           (err) => { setGpsError(err.code === 1 ? 'Permiso de GPS denegado.' : 'Error GPS: ' + err.message); },
           { enableHighAccuracy: true, maximumAge: 5000 }
         );
         navWatchRef.current = wid;
-
-        // Start re-routing timer
-        rerouteTimerRef.current = setInterval(async () => {
-          // Will be handled by the reroute effect
-        }, REROUTE_INTERVAL);
       },
       (err) => {
         setGpsError(err.code === 1 ? 'Permiso de GPS denegado.' : 'Error GPS: ' + err.message);
@@ -399,6 +431,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
       setNavRoute(null);
       setNavInfo(null);
       setZoneName(navTarget.nombre);
+      // Haptic feedback on arrival
+      try { navigator.vibrate?.(200); } catch(_) {}
       // Stop rerouting
       if (rerouteTimerRef.current !== null) {
         clearInterval(rerouteTimerRef.current);
@@ -437,7 +471,16 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     const id = navigator.geolocation.watchPosition(
       (pos) => {
         const nc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserPosition([nc.lat, nc.lng]);
+        const newPos: [number,number] = [nc.lat, nc.lng];
+        setUserPosition(newPos);
+        // Update heading
+        if (pos.coords.heading != null && !isNaN(pos.coords.heading)) {
+          setUserHeading(pos.coords.heading);
+        } else if (lastPosRef.current) {
+          const d = haversineDistance({lat: lastPosRef.current[0], lng: lastPosRef.current[1]}, nc);
+          if (d > 5) setUserHeading(calculateBearing(lastPosRef.current, newPos));
+        }
+        lastPosRef.current = newPos;
         setRouteCoords(prev => {
           if (prev.length === 0) return [nc];
           if (haversineDistance(prev[prev.length-1], nc) < MIN_DISTANCE_METERS) return prev;
@@ -511,6 +554,9 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   // Filter: asesores only see their own zones, superadmin sees all
   const visibleZonas = isAdmin ? zonas : zonas.filter(z => z.asignado_a === currentUserId);
 
+  // Memoize user position icon — only re-create when heading changes by 15°
+  const currentUserIcon = useMemo(() => createUserIcon(userHeading !== null ? Math.round(userHeading / 15) * 15 : null), [userHeading !== null ? Math.round(userHeading / 15) : null]);
+
   // Generate and filter grid cells
   const baseGrid = React.useMemo(() => generateMaracaiboGrid(), []);
   const availableGrid = useMemo(() => baseGrid.filter(cell => {
@@ -533,17 +579,17 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
           <p className="text-slate-500 mt-1">Peinado de zonas con GPS · Costa Occidental y Oriental del Lago</p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-2xl text-center">
-            <p className="text-2xl font-black text-emerald-700">{todayRecs.length}</p>
-            <p className="text-[10px] font-bold text-emerald-500 uppercase">Hoy</p>
+          <div className="px-4 py-2.5 rounded-2xl text-center border border-emerald-200/50 shadow-sm" style={{ background: 'rgba(236,253,245,0.8)', backdropFilter: 'blur(8px)' }}>
+            <p className="text-2xl font-black bg-gradient-to-br from-emerald-600 to-teal-600 bg-clip-text text-transparent">{todayRecs.length}</p>
+            <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Hoy</p>
           </div>
-          <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-2xl text-center">
-            <p className="text-2xl font-black text-blue-700">{captaciones.length}</p>
-            <p className="text-[10px] font-bold text-blue-500 uppercase">Captaciones</p>
+          <div className="px-4 py-2.5 rounded-2xl text-center border border-blue-200/50 shadow-sm" style={{ background: 'rgba(239,246,255,0.8)', backdropFilter: 'blur(8px)' }}>
+            <p className="text-2xl font-black bg-gradient-to-br from-blue-600 to-indigo-600 bg-clip-text text-transparent">{captaciones.length}</p>
+            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Captaciones</p>
           </div>
-          <div className="bg-purple-50 border border-purple-200 px-4 py-2 rounded-2xl text-center">
-            <p className="text-2xl font-black text-purple-700">{formatDistance(totalDist)}</p>
-            <p className="text-[10px] font-bold text-purple-500 uppercase">Total</p>
+          <div className="px-4 py-2.5 rounded-2xl text-center border border-purple-200/50 shadow-sm" style={{ background: 'rgba(245,243,255,0.8)', backdropFilter: 'blur(8px)' }}>
+            <p className="text-2xl font-black bg-gradient-to-br from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">{formatDistance(totalDist)}</p>
+            <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Total</p>
           </div>
         </div>
       </div>
@@ -577,15 +623,19 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             </div>
           )}
 
-          {/* Arrived Banner — Glass */}
+          {/* Arrived Banner — Glass + Celebration */}
           {hasArrived && (
-            <div className="px-5 py-4 border-b border-emerald-400/30" style={{ background: 'linear-gradient(135deg, rgba(5,150,105,0.92), rgba(13,148,136,0.92))', backdropFilter: 'blur(12px)' }}>
+            <div className="px-5 py-4 border-b border-emerald-400/30 animate-in slide-in-from-top duration-500" style={{ background: 'linear-gradient(135deg, rgba(5,150,105,0.92), rgba(13,148,136,0.92))', backdropFilter: 'blur(12px)' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-white" /></div>
+                  <div className="w-12 h-12 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center" style={{ animation: 'farmBounce 0.6s cubic-bezier(.36,.07,.19,.97)' }}>
+                    <style>{`@keyframes farmBounce{0%{transform:scale(0)}50%{transform:scale(1.3)}100%{transform:scale(1)}}`}</style>
+                    <CheckCircle2 className="w-7 h-7 text-white" />
+                  </div>
                   <div>
                     <p className="text-xs text-emerald-200 font-medium uppercase tracking-wider">Destino alcanzado</p>
-                    <p className="text-base font-bold text-white">{navTarget?.nombre}</p>
+                    <p className="text-lg font-bold text-white">{navTarget?.nombre}</p>
+                    <p className="text-xs text-emerald-200">Puedes iniciar tu recorrido</p>
                   </div>
                 </div>
                 <button onClick={() => { setHasArrived(false); setNavTarget(null); stopNavigation(); }} className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-90">Cerrar</button>
@@ -594,13 +644,13 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
           )}
 
           {!isTracking && !isNavigating && !hasArrived && (
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 transition-all duration-300">
               <MapPin className="w-5 h-5 text-slate-400" />
               <input type="text" value={zoneName} onChange={e => setZoneName(e.target.value)} placeholder="Nombre de la zona a recorrer..." className="flex-1 bg-transparent text-sm outline-none" />
             </div>
           )}
           {isTracking && (
-            <div className="px-4 py-3 border-b border-emerald-200 bg-emerald-50 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-emerald-200 bg-emerald-50 flex items-center justify-between transition-all duration-300">
               <div className="flex items-center gap-3"><div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" /><span className="text-sm font-bold text-emerald-800">Recorriendo: {zoneName || 'Sin nombre'}</span></div>
               <div className="flex gap-4 text-xs font-bold text-emerald-600"><span>{routeCoords.length} pts</span><span>{formatDistance(currentDistance)}</span></div>
             </div>
@@ -627,8 +677,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 </Marker>
               )}
 
-              {/* User position (visible during navigation AND tracking) */}
-              {userPosition && (isTracking || isNavigating) && <Marker position={userPosition} icon={userPositionIcon} />}
+              {/* User position with directional heading */}
+              {userPosition && (isTracking || isNavigating) && <Marker position={userPosition} icon={currentUserIcon} />}
 
               {/* Available Grid Cells */}
               {isAdmin && availableGrid.map(cell => (
