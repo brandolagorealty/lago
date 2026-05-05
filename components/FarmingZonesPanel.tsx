@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Target, Edit2, Check, X } from 'lucide-react';
+import { Trash2, Target, Edit2, Check, X, Compass } from 'lucide-react';
 import { propertyService } from '../services/supabase';
 import { ZonaFarming, UserRole } from '../types';
 
@@ -10,9 +10,12 @@ interface Props {
   onRefresh: () => void;
   onSelectZona: (z: ZonaFarming | null) => void;
   selectedZona: ZonaFarming | null;
+  onNavigate?: (z: ZonaFarming) => void;
+  isNavigating?: boolean;
+  navTarget?: ZonaFarming | null;
 }
 
-export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh, onSelectZona, selectedZona }: Props) {
+export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh, onSelectZona, selectedZona, onNavigate, isNavigating, navTarget }: Props) {
   const [renameZoneId, setRenameZoneId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -91,6 +94,13 @@ export default function FarmingZonesPanel({ zonas, userRoles, isAdmin, onRefresh
                   <p className="text-[10px] text-slate-500">{z.asignado_email?.split('@')[0] || 'Sin asignar'} · {z.km_recorridos.toFixed(1)}/{z.meta_km} km</p>
                 </div>
                 <span className="text-xs font-bold" style={{ color: pct >= 75 ? '#10b981' : pct >= 25 ? '#f59e0b' : '#ef4444' }}>{pct}%</span>
+                {!isAdmin && onNavigate && (
+                  <button onClick={e => { e.stopPropagation(); onNavigate(z); }} disabled={isNavigating && navTarget?.id !== z.id}
+                    className={`p-1.5 rounded-xl transition-all ${isNavigating && navTarget?.id === z.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 animate-pulse' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-30 disabled:cursor-not-allowed'}`}
+                    title={isNavigating && navTarget?.id === z.id ? 'Navegando...' : 'Navegar a esta zona'}>
+                    <Compass className="w-4 h-4" />
+                  </button>
+                )}
                 {isAdmin && <button onClick={e => { e.stopPropagation(); handleDelete(z.id); }} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
               </div>
               <div className="h-2 bg-slate-200 rounded-full overflow-hidden mt-2">

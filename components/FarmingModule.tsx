@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target, Star, ChevronDown, ChevronRight, ClipboardList, BookOpen, Users } from 'lucide-react';
+import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target, Star, ChevronDown, ChevronRight, ClipboardList, BookOpen, Users, Compass, Crosshair, Navigation2, CheckCircle2 } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { propertyService } from '../services/supabase';
@@ -44,6 +44,15 @@ const DEFAULT_REPORT: ReporteInteligencia = { carteles_duenos: '0', carteles_com
 
 const COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#a855f7', '#ef4444', '#64748b', '#0ea5e9'];
 
+const destinationIcon = new L.DivIcon({
+  className: '',
+  html: `<div style="background:#ef4444;width:34px;height:34px;border-radius:50%;border:3px solid white;box-shadow:0 2px 10px rgba(239,68,68,.4);display:flex;align-items:center;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="3,11 22,2 13,21 11,13"/></svg></div>`,
+  iconSize: [34, 34], iconAnchor: [17, 17],
+});
+
+const ARRIVAL_DISTANCE = 150; // meters
+const REROUTE_INTERVAL = 20000; // 20 seconds
+
 function haversineDistance(a: {lat:number;lng:number}, b: {lat:number;lng:number}): number {
   const R = 6371000;
   const dLat = (b.lat - a.lat) * Math.PI / 180;
@@ -56,9 +65,43 @@ function formatDistance(m: number): string {
   return m >= 1000 ? (m/1000).toFixed(1) + ' km' : Math.round(m) + ' m';
 }
 
+function formatDuration(s: number): string {
+  if (s < 60) return '< 1 min';
+  const mins = Math.round(s / 60);
+  return mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `~${mins} min`;
+}
+
+function getCentroid(poligono: {lat:number;lng:number}[]): [number,number] {
+  const lat = poligono.reduce((s, p) => s + p.lat, 0) / poligono.length;
+  const lng = poligono.reduce((s, p) => s + p.lng, 0) / poligono.length;
+  return [lat, lng];
+}
+
+async function fetchOSRMRoute(from: [number,number], to: [number,number]): Promise<{coords: [number,number][], distance: number, duration: number} | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.code === 'Ok' && data.routes.length > 0) {
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number,number]);
+      return { coords, distance: route.distance, duration: route.duration };
+    }
+  } catch (e) { console.error('OSRM routing error:', e); }
+  return null;
+}
+
 function RecenterMap({ position }: { position: [number, number] | null }) {
   const map = useMap();
   useEffect(() => { if (position) map.setView(position, map.getZoom()); }, [position]);
+  return null;
+}
+
+function FlyToPosition({ position, trigger }: { position: [number,number] | null, trigger: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position && trigger > 0) map.flyTo(position, Math.max(map.getZoom(), 16), { duration: 0.8 });
+  }, [trigger]);
   return null;
 }
 
@@ -223,14 +266,32 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const [expandedZones, setExpandedZones] = useState<Record<string, boolean>>({});
   const [bitacoraFilter, setBitacoraFilter] = useState<string>('all');
 
+  // Navigation state
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navRoute, setNavRoute] = useState<[number,number][] | null>(null);
+  const [navInfo, setNavInfo] = useState<{distance: number; duration: number} | null>(null);
+  const [navTarget, setNavTarget] = useState<ZonaFarming | null>(null);
+  const [hasArrived, setHasArrived] = useState(false);
+  const [centerTrigger, setCenterTrigger] = useState(0);
+  const navWatchRef = useRef<number | null>(null);
+  const rerouteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => { loadData(); }, []);
 
-  // Cleanup GPS watch on unmount to prevent battery drain / memory leak
+  // Cleanup all GPS watches on unmount
   useEffect(() => {
     return () => {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
+      }
+      if (navWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(navWatchRef.current);
+        navWatchRef.current = null;
+      }
+      if (rerouteTimerRef.current !== null) {
+        clearInterval(rerouteTimerRef.current);
+        rerouteTimerRef.current = null;
       }
     };
   }, []);
@@ -245,6 +306,113 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   };
 
   const currentDistance = useMemo(() => routeCoords.reduce((sum, c, i) => i === 0 ? 0 : sum + haversineDistance(routeCoords[i-1], c), 0), [routeCoords]);
+
+  // ===================== NAVIGATION SYSTEM =====================
+  const startNavigation = useCallback(async (zona: ZonaFarming) => {
+    if (!navigator.geolocation) { setGpsError('Tu navegador no soporta GPS.'); return; }
+    if (!zona.poligono || zona.poligono.length < 3) { setGpsError('Esta zona no tiene polígono definido.'); return; }
+    setGpsError(null); setHasArrived(false);
+    setNavTarget(zona);
+    setIsNavigating(true);
+
+    // Get initial position
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const from: [number,number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserPosition(from);
+        const to = getCentroid(zona.poligono);
+
+        // Calculate initial route
+        const result = await fetchOSRMRoute(from, to);
+        if (result) {
+          setNavRoute(result.coords);
+          setNavInfo({ distance: result.distance, duration: result.duration });
+        } else {
+          setGpsError('No se pudo calcular la ruta. Intenta de nuevo.');
+        }
+
+        // Start continuous GPS watch for navigation
+        const wid = navigator.geolocation.watchPosition(
+          (p) => {
+            setUserPosition([p.coords.latitude, p.coords.longitude]);
+          },
+          (err) => { setGpsError(err.code === 1 ? 'Permiso de GPS denegado.' : 'Error GPS: ' + err.message); },
+          { enableHighAccuracy: true, maximumAge: 5000 }
+        );
+        navWatchRef.current = wid;
+
+        // Start re-routing timer
+        rerouteTimerRef.current = setInterval(async () => {
+          // Will be handled by the reroute effect
+        }, REROUTE_INTERVAL);
+      },
+      (err) => {
+        setGpsError(err.code === 1 ? 'Permiso de GPS denegado.' : 'Error GPS: ' + err.message);
+        setIsNavigating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  const stopNavigation = useCallback(() => {
+    if (navWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(navWatchRef.current);
+      navWatchRef.current = null;
+    }
+    if (rerouteTimerRef.current !== null) {
+      clearInterval(rerouteTimerRef.current);
+      rerouteTimerRef.current = null;
+    }
+    setIsNavigating(false);
+    setNavRoute(null);
+    setNavInfo(null);
+    setNavTarget(null);
+    setHasArrived(false);
+  }, []);
+
+  // Re-routing & arrival detection effect
+  useEffect(() => {
+    if (!isNavigating || !userPosition || !navTarget?.poligono || hasArrived) return;
+
+    const dest = getCentroid(navTarget.poligono);
+    const distToDest = haversineDistance(
+      { lat: userPosition[0], lng: userPosition[1] },
+      { lat: dest[0], lng: dest[1] }
+    );
+
+    // Arrival detection
+    if (distToDest < ARRIVAL_DISTANCE) {
+      setHasArrived(true);
+      setNavRoute(null);
+      setNavInfo(null);
+      setZoneName(navTarget.nombre);
+      // Stop rerouting
+      if (rerouteTimerRef.current !== null) {
+        clearInterval(rerouteTimerRef.current);
+        rerouteTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Set up re-routing interval
+    if (rerouteTimerRef.current) clearInterval(rerouteTimerRef.current);
+    rerouteTimerRef.current = setInterval(async () => {
+      if (!userPosition || !navTarget?.poligono) return;
+      const currentDest = getCentroid(navTarget.poligono);
+      const result = await fetchOSRMRoute(userPosition, currentDest);
+      if (result) {
+        setNavRoute(result.coords);
+        setNavInfo({ distance: result.distance, duration: result.duration });
+      }
+    }, REROUTE_INTERVAL);
+
+    return () => {
+      if (rerouteTimerRef.current) {
+        clearInterval(rerouteTimerRef.current);
+        rerouteTimerRef.current = null;
+      }
+    };
+  }, [isNavigating, userPosition, navTarget, hasArrived]);
 
   // GPS tracking
   const startTracking = useCallback(async () => {
@@ -374,7 +542,32 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Map Column */}
         <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {!isTracking && (
+          {/* Navigation Banner */}
+          {isNavigating && !hasArrived && navInfo && (
+            <div className="px-4 py-3 border-b border-blue-300 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"><Compass className="w-5 h-5 text-white animate-pulse" /></div>
+                <div><p className="text-sm font-bold text-white">Navegando a: {navTarget?.nombre}</p><p className="text-xs text-blue-200">Ruta recalculándose automáticamente</p></div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right"><p className="text-sm font-black text-white">{formatDistance(navInfo.distance)}</p><p className="text-xs text-blue-200">{formatDuration(navInfo.duration)}</p></div>
+                <button onClick={stopNavigation} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-xl transition-colors" title="Cancelar navegación"><X className="w-4 h-4" /></button>
+              </div>
+            </div>
+          )}
+
+          {/* Arrived Banner */}
+          {hasArrived && (
+            <div className="px-4 py-3 border-b border-emerald-300 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-white" /></div>
+                <div><p className="text-sm font-bold text-white">✅ Has llegado a: {navTarget?.nombre}</p><p className="text-xs text-emerald-200">Puedes iniciar tu recorrido de farming</p></div>
+              </div>
+              <button onClick={() => { setHasArrived(false); setNavTarget(null); stopNavigation(); }} className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-colors">Cerrar</button>
+            </div>
+          )}
+
+          {!isTracking && !isNavigating && !hasArrived && (
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
               <MapPin className="w-5 h-5 text-slate-400" />
               <input type="text" value={zoneName} onChange={e => setZoneName(e.target.value)} placeholder="Nombre de la zona a recorrer..." className="flex-1 bg-transparent text-sm outline-none" />
@@ -387,12 +580,32 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             </div>
           )}
 
-          <div style={{ height: '55vh', minHeight: 350 }}>
+          <div style={{ height: '55vh', minHeight: 350, position: 'relative' }}>
+            {/* Center on Me floating button */}
+            {(isNavigating || isTracking) && userPosition && (
+              <button onClick={() => setCenterTrigger(t => t + 1)} className="absolute top-3 right-3 z-[1000] bg-white shadow-lg shadow-slate-300/50 rounded-2xl p-3 hover:bg-slate-50 active:scale-95 transition-all border border-slate-200" title="Centrar en mi posición">
+                <Crosshair className="w-5 h-5 text-blue-600" />
+              </button>
+            )}
             <MapContainer center={MARACAIBO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
               <TileLayer attribution='&copy; OSM' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <RecenterMap position={isTracking ? userPosition : null} />
+              <FlyToPosition position={userPosition} trigger={centerTrigger} />
               
               {showHeatmap && <HeatmapLayer points={heatPoints} />}
+
+              {/* Navigation route (blue dashed) */}
+              {navRoute && navRoute.length > 1 && <Polyline positions={navRoute} pathOptions={{ color: '#3b82f6', weight: 5, opacity: 0.8, dashArray: '12 8' }} />}
+
+              {/* Destination marker */}
+              {isNavigating && !hasArrived && navTarget?.poligono && (
+                <Marker position={getCentroid(navTarget.poligono)} icon={destinationIcon}>
+                  <Popup><div className="text-xs font-bold">🎯 Destino: {navTarget.nombre}</div></Popup>
+                </Marker>
+              )}
+
+              {/* User position (visible during navigation AND tracking) */}
+              {userPosition && (isTracking || isNavigating) && <Marker position={userPosition} icon={userPositionIcon} />}
 
               {/* Available Grid Cells */}
               {isAdmin && availableGrid.map(cell => (
@@ -421,11 +634,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 <Polyline key={r.id} positions={r.coordenadas_ruta.map((c: any) => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '8 6' }} />
               ))}
 
-              {/* Active route */}
+              {/* Active tracking route (green) */}
               {routeCoords.length > 1 && <Polyline positions={routeCoords.map(c => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#10b981', weight: 5, opacity: 0.9 }} />}
-
-              {/* User position */}
-              {userPosition && isTracking && <Marker position={userPosition} icon={userPositionIcon} />}
 
               {/* Captacion markers */}
               {captaciones.map(c => (
@@ -467,7 +677,8 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
         {/* Zones Panel (right side) */}
         <div className="w-full lg:w-80 shrink-0">
           <FarmingZonesPanel zonas={visibleZonas} userRoles={userRoles || []} isAdmin={isAdmin}
-            onRefresh={loadData} onSelectZona={setSelectedZona} selectedZona={selectedZona} />
+            onRefresh={loadData} onSelectZona={setSelectedZona} selectedZona={selectedZona}
+            onNavigate={startNavigation} isNavigating={isNavigating} navTarget={navTarget} />
         </div>
       </div>
 
