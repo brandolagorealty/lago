@@ -36,8 +36,15 @@ const captacionIcon = new L.DivIcon({
 
 const userPositionIcon = new L.DivIcon({
   className: '',
-  html: `<div style="width:18px;height:18px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,.2)"></div>`,
-  iconSize: [18, 18], iconAnchor: [9, 9],
+  html: `<style>
+    @keyframes farmPulse { 0% { transform: translate(-50%,-50%) scale(1); opacity: 0.5; } 100% { transform: translate(-50%,-50%) scale(3.5); opacity: 0; } }
+  </style>
+  <div style="position:relative;width:24px;height:24px;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(59,130,246,.5);z-index:2;"></div>
+    <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:rgba(59,130,246,.35);border-radius:50%;animation:farmPulse 2s ease-out infinite;"></div>
+    <div style="position:absolute;top:50%;left:50%;width:14px;height:14px;background:rgba(59,130,246,.2);border-radius:50%;animation:farmPulse 2s ease-out 0.8s infinite;"></div>
+  </div>`,
+  iconSize: [24, 24], iconAnchor: [12, 12],
 });
 
 const DEFAULT_REPORT: ReporteInteligencia = { carteles_duenos: '0', carteles_competencia: '0', inmuebles_abandonados: '0', contactos_clave: '0', tarjetas_entregadas: '0', actividad_construccion: 'Nula', receptividad: 'Indiferente', potencial_captacion: 3, notas: '' };
@@ -46,8 +53,14 @@ const COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'
 
 const destinationIcon = new L.DivIcon({
   className: '',
-  html: `<div style="background:#ef4444;width:34px;height:34px;border-radius:50%;border:3px solid white;box-shadow:0 2px 10px rgba(239,68,68,.4);display:flex;align-items:center;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="3,11 22,2 13,21 11,13"/></svg></div>`,
-  iconSize: [34, 34], iconAnchor: [17, 17],
+  html: `<style>
+    @keyframes farmDestPulse { 0% { transform: translate(-50%,-50%) scale(1); opacity: 0.6; } 100% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } }
+  </style>
+  <div style="position:relative;width:40px;height:40px;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,#ef4444,#f97316);width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 4px 14px rgba(239,68,68,.5);display:flex;align-items:center;justify-content:center;z-index:2;"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="3,11 22,2 13,21 11,13"/></svg></div>
+    <div style="position:absolute;top:50%;left:50%;width:30px;height:30px;border:3px solid rgba(239,68,68,.4);border-radius:50%;animation:farmDestPulse 1.5s ease-out infinite;"></div>
+  </div>`,
+  iconSize: [40, 40], iconAnchor: [20, 20],
 });
 
 const ARRIVAL_DISTANCE = 150; // meters
@@ -542,28 +555,41 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Map Column */}
         <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Navigation Banner */}
+          {/* Navigation Banner — Glass */}
           {isNavigating && !hasArrived && navInfo && (
-            <div className="px-4 py-3 border-b border-blue-300 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"><Compass className="w-5 h-5 text-white animate-pulse" /></div>
-                <div><p className="text-sm font-bold text-white">Navegando a: {navTarget?.nombre}</p><p className="text-xs text-blue-200">Ruta recalculándose automáticamente</p></div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right"><p className="text-sm font-black text-white">{formatDistance(navInfo.distance)}</p><p className="text-xs text-blue-200">{formatDuration(navInfo.duration)}</p></div>
-                <button onClick={stopNavigation} className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-xl transition-colors" title="Cancelar navegación"><X className="w-4 h-4" /></button>
+            <div className="px-5 py-4 border-b border-blue-400/30" style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.92), rgba(79,70,229,0.92))', backdropFilter: 'blur(12px)' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center"><Compass className="w-6 h-6 text-white animate-pulse" /></div>
+                  <div>
+                    <p className="text-xs text-blue-200 font-medium uppercase tracking-wider">Navegando a</p>
+                    <p className="text-base font-bold text-white">{navTarget?.nombre}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-2xl font-black text-white leading-none">{formatDistance(navInfo.distance)}</p>
+                    <p className="text-xs text-blue-200 font-bold">{formatDuration(navInfo.duration)}</p>
+                  </div>
+                  <button onClick={stopNavigation} className="bg-white/15 hover:bg-white/25 text-white p-2.5 rounded-xl transition-all active:scale-90" title="Cancelar navegación"><X className="w-5 h-5" /></button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Arrived Banner */}
+          {/* Arrived Banner — Glass */}
           {hasArrived && (
-            <div className="px-4 py-3 border-b border-emerald-300 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-white" /></div>
-                <div><p className="text-sm font-bold text-white">✅ Has llegado a: {navTarget?.nombre}</p><p className="text-xs text-emerald-200">Puedes iniciar tu recorrido de farming</p></div>
+            <div className="px-5 py-4 border-b border-emerald-400/30" style={{ background: 'linear-gradient(135deg, rgba(5,150,105,0.92), rgba(13,148,136,0.92))', backdropFilter: 'blur(12px)' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-white" /></div>
+                  <div>
+                    <p className="text-xs text-emerald-200 font-medium uppercase tracking-wider">Destino alcanzado</p>
+                    <p className="text-base font-bold text-white">{navTarget?.nombre}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setHasArrived(false); setNavTarget(null); stopNavigation(); }} className="bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-90">Cerrar</button>
               </div>
-              <button onClick={() => { setHasArrived(false); setNavTarget(null); stopNavigation(); }} className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-colors">Cerrar</button>
             </div>
           )}
 
@@ -582,14 +608,17 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
 
           <div style={{ height: '55vh', minHeight: 350, position: 'relative' }}>
             <MapContainer center={MARACAIBO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-              <TileLayer attribution='&copy; OSM' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer attribution='&copy; <a href="https://carto.com">CARTO</a>' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
               <RecenterMap position={isTracking ? userPosition : null} />
               <FlyToPosition position={userPosition} trigger={centerTrigger} />
               
               {showHeatmap && <HeatmapLayer points={heatPoints} />}
 
-              {/* Navigation route (blue dashed) */}
-              {navRoute && navRoute.length > 1 && <Polyline positions={navRoute} pathOptions={{ color: '#3b82f6', weight: 5, opacity: 0.8, dashArray: '12 8' }} />}
+              {/* Navigation route — glow layer + main route */}
+              {navRoute && navRoute.length > 1 && <>
+                <Polyline positions={navRoute} pathOptions={{ color: '#3b82f6', weight: 14, opacity: 0.15, lineCap: 'round', lineJoin: 'round' }} />
+                <Polyline positions={navRoute} pathOptions={{ color: '#60a5fa', weight: 6, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }} />
+              </>}
 
               {/* Destination marker */}
               {isNavigating && !hasArrived && navTarget?.poligono && (
@@ -615,10 +644,16 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 </Polygon>
               ))}
 
-              {/* Zones as polygons */}
+              {/* Zones as polygons — highlighted when navigating to them */}
               {visibleZonas.map(z => z.poligono && z.poligono.length >= 3 && (
                 <Polygon key={z.id} positions={z.poligono.map(p => [p.lat, p.lng] as [number,number])}
-                  pathOptions={{ color: z.color, fillColor: z.color, fillOpacity: getZoneOpacity(z), weight: selectedZona?.id === z.id ? 3 : 1 }}>
+                  pathOptions={{
+                    color: isNavigating && navTarget?.id === z.id ? '#facc15' : z.color,
+                    fillColor: isNavigating && navTarget?.id === z.id ? '#facc15' : z.color,
+                    fillOpacity: isNavigating && navTarget?.id === z.id ? 0.25 : getZoneOpacity(z),
+                    weight: isNavigating && navTarget?.id === z.id ? 4 : (selectedZona?.id === z.id ? 3 : 1),
+                    dashArray: isNavigating && navTarget?.id === z.id ? '8 4' : undefined,
+                  }}>
                   <Popup><div className="text-xs"><p className="font-bold">{z.nombre}</p><p>{z.asignado_email || 'Sin asignar'}</p><p>{z.meta_km > 0 ? Math.round((z.km_recorridos/z.meta_km)*100) : 0}% cubierto</p></div></Popup>
                 </Polygon>
               ))}
@@ -647,36 +682,40 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
             )}
           </div>
 
-          {/* Controls */}
-          <div className="px-4 py-4 border-t border-slate-100 flex items-center gap-3 flex-wrap">
+          {/* Controls — Floating Glass Bar */}
+          <div className="px-4 py-3 border-t border-slate-200/50" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)' }}>
+            <div className="flex items-center gap-2.5 flex-wrap">
             {!isTracking ? (
-              <button onClick={startTracking} disabled={isSaving || isNavigating} className="flex-1 min-w-[200px] bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3">
-                <Play className="w-6 h-6" /> {isSaving ? 'Iniciando...' : 'Iniciar Recorrido'}
+              <button onClick={startTracking} disabled={isSaving || isNavigating} className="flex-1 min-w-[180px] text-white px-5 py-3.5 rounded-2xl font-bold text-base transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-2.5 disabled:shadow-none disabled:opacity-40" style={{ background: 'linear-gradient(135deg, #059669, #0d9488)' }}>
+                <Play className="w-5 h-5" /> {isSaving ? 'Iniciando...' : 'Iniciar Recorrido'}
               </button>
             ) : (
               <>
-                <button onClick={stopTracking} disabled={isSaving} className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center gap-3">
-                  <Square className="w-6 h-6" /> {isSaving ? 'Guardando...' : 'Detener'}
+                <button onClick={stopTracking} disabled={isSaving} className="flex-1 text-white px-5 py-3.5 rounded-2xl font-bold text-base transition-all shadow-xl shadow-red-600/20 active:scale-95 flex items-center justify-center gap-2.5" style={{ background: 'linear-gradient(135deg, #dc2626, #e11d48)' }}>
+                  <Square className="w-5 h-5" /> {isSaving ? 'Guardando...' : 'Detener'}
                 </button>
-                <button onClick={() => setShowCapture(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center gap-3">
-                  <Plus className="w-6 h-6" /> Inmueble
+                <button onClick={() => setShowCapture(true)} className="flex-1 text-white px-5 py-3.5 rounded-2xl font-bold text-base transition-all shadow-xl shadow-blue-600/20 active:scale-95 flex items-center justify-center gap-2.5" style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)' }}>
+                  <Plus className="w-5 h-5" /> Inmueble
                 </button>
               </>
             )}
-            {(isNavigating || isTracking) && userPosition && (
-              <button onClick={() => setCenterTrigger(t => t + 1)} className={`p-4 rounded-2xl transition-colors bg-blue-100 text-blue-600 hover:bg-blue-200`} title="Centrar en mi posición">
-                <Crosshair className="w-6 h-6" />
+            <div className="flex gap-1.5">
+              {(isNavigating || isTracking) && userPosition && (
+                <button onClick={() => setCenterTrigger(t => t + 1)} className="p-3 rounded-xl transition-all bg-white/80 backdrop-blur border border-blue-200 text-blue-600 hover:bg-blue-50 shadow-sm active:scale-90" title="Centrar">
+                  <Crosshair className="w-5 h-5" />
+                </button>
+              )}
+              <button onClick={() => setShowHeatmap(!showHeatmap)} className={`p-3 rounded-xl transition-all shadow-sm active:scale-90 ${showHeatmap ? 'bg-orange-500 text-white shadow-orange-500/20' : 'bg-white/80 backdrop-blur border border-slate-200 text-slate-500 hover:bg-slate-50'}`} title="Mapa de Calor">
+                <Flame className="w-5 h-5" />
               </button>
-            )}
-            <button onClick={() => setShowHeatmap(!showHeatmap)} className={`p-4 rounded-2xl transition-colors ${showHeatmap ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Mapa de Calor">
-              <Flame className="w-6 h-6" />
-            </button>
-            <button onClick={() => setShowHistory(!showHistory)} className={`p-4 rounded-2xl transition-colors ${showHistory ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Historial">
-              <Clock className="w-6 h-6" />
-            </button>
-            <button onClick={() => setShowBitacora(!showBitacora)} className={`p-4 rounded-2xl transition-colors ${showBitacora ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Bitácora de Farming">
-              <BookOpen className="w-6 h-6" />
-            </button>
+              <button onClick={() => setShowHistory(!showHistory)} className={`p-3 rounded-xl transition-all shadow-sm active:scale-90 ${showHistory ? 'bg-blue-500 text-white shadow-blue-500/20' : 'bg-white/80 backdrop-blur border border-slate-200 text-slate-500 hover:bg-slate-50'}`} title="Historial">
+                <Clock className="w-5 h-5" />
+              </button>
+              <button onClick={() => setShowBitacora(!showBitacora)} className={`p-3 rounded-xl transition-all shadow-sm active:scale-90 ${showBitacora ? 'bg-amber-500 text-white shadow-amber-500/20' : 'bg-white/80 backdrop-blur border border-slate-200 text-slate-500 hover:bg-slate-50'}`} title="Bitácora">
+                <BookOpen className="w-5 h-5" />
+              </button>
+            </div>
+            </div>
           </div>
         </div>
 
