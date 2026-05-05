@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target, Star, ChevronDown, ChevronRight, ClipboardList, BookOpen, Users, Compass, Crosshair, Navigation2, CheckCircle2 } from 'lucide-react';
+import { MapPin, Play, Square, Plus, X, Phone, FileText, Trash2, Navigation, Clock, Route, Flame, Target, Star, ChevronDown, ChevronRight, ClipboardList, BookOpen, Users, Compass, Crosshair, Navigation2, CheckCircle2, Volume2, VolumeX } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { propertyService } from '../services/supabase';
@@ -120,18 +120,86 @@ function createUserIcon(heading: number | null): L.DivIcon {
   });
 }
 
-async function fetchOSRMRoute(from: [number,number], to: [number,number]): Promise<{coords: [number,number][], distance: number, duration: number} | null> {
+async function fetchOSRMRoute(from: [number,number], to: [number,number]): Promise<{coords: [number,number][], distance: number, duration: number, steps: NavStep[]} | null> {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson&steps=true`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.code === 'Ok' && data.routes.length > 0) {
       const route = data.routes[0];
       const coords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number,number]);
-      return { coords, distance: route.distance, duration: route.duration };
+      const steps: NavStep[] = (route.legs[0]?.steps || []).map((s: any) => ({
+        instruction: translateManeuver(s.maneuver?.type || '', s.maneuver?.modifier || '', s.name || '', s.distance || 0),
+        distance: s.distance || 0,
+        location: [s.maneuver.location[1], s.maneuver.location[0]] as [number,number],
+        maneuverType: s.maneuver?.type || '',
+        modifier: s.maneuver?.modifier || '',
+      }));
+      return { coords, distance: route.distance, duration: route.duration, steps };
     }
   } catch (e) { console.error('OSRM routing error:', e); }
   return null;
+}
+
+interface NavStep {
+  instruction: string;
+  distance: number;
+  location: [number,number];
+  maneuverType: string;
+  modifier: string;
+}
+
+function translateManeuver(type: string, modifier: string, street: string, distance: number): string {
+  const st = street && street !== '' ? ` en ${street}` : '';
+  switch(type) {
+    case 'turn':
+      if (modifier.includes('left') && modifier.includes('sharp')) return `Gira fuerte a la izquierda${st}`;
+      if (modifier.includes('right') && modifier.includes('sharp')) return `Gira fuerte a la derecha${st}`;
+      if (modifier.includes('slight') && modifier.includes('left')) return `Gira levemente a la izquierda${st}`;
+      if (modifier.includes('slight') && modifier.includes('right')) return `Gira levemente a la derecha${st}`;
+      if (modifier.includes('left')) return `Gira a la izquierda${st}`;
+      if (modifier.includes('right')) return `Gira a la derecha${st}`;
+      if (modifier === 'uturn') return `Da la vuelta en U`;
+      return `Gira${st}`;
+    case 'new name': case 'continue': return `Continúa por ${street || 'la vía'}`;
+    case 'depart': return `Dirígete hacia ${street || 'la vía'}`;
+    case 'arrive': return `Has llegado a tu destino`;
+    case 'merge': return `Incorpórate${st}`;
+    case 'fork':
+      if (modifier.includes('left')) return `Toma el desvío izquierdo${st}`;
+      if (modifier.includes('right')) return `Toma el desvío derecho${st}`;
+      return `Toma el desvío${st}`;
+    case 'roundabout': case 'rotary': return `Entra a la rotonda${st}`;
+    case 'end of road':
+      if (modifier.includes('left')) return `Al final de la calle, gira a la izquierda`;
+      if (modifier.includes('right')) return `Al final de la calle, gira a la derecha`;
+      return `Al final de la calle`;
+    default: return `Continúa recto`;
+  }
+}
+
+function getManeuverIcon(type: string, modifier: string): string {
+  if (type === 'arrive') return '🏁';
+  if (type === 'depart') return '🚩';
+  if (type === 'roundabout' || type === 'rotary') return '🔄';
+  if (modifier.includes('left') && modifier.includes('sharp')) return '⬅';
+  if (modifier.includes('right') && modifier.includes('sharp')) return '➡';
+  if (modifier.includes('slight') && modifier.includes('left')) return '↖';
+  if (modifier.includes('slight') && modifier.includes('right')) return '↗';
+  if (modifier.includes('left')) return '↰';
+  if (modifier.includes('right')) return '↱';
+  if (modifier === 'uturn') return '↻';
+  return '⬆';
+}
+
+function speakNav(text: string) {
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-ES'; u.rate = 1.05; u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  } catch(_) {}
 }
 
 function RecenterMap({ position }: { position: [number, number] | null }) {
@@ -321,6 +389,14 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
   const navWatchRef = useRef<number | null>(null);
   const rerouteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Voice navigation state
+  const [navSteps, setNavSteps] = useState<NavStep[]>([]);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [currentInstruction, setCurrentInstruction] = useState<string | null>(null);
+  const spokenStepsRef = useRef<Set<number>>(new Set());
+  const approachingSpokenRef = useRef(false);
+
   useEffect(() => { loadData(); }, []);
 
   // Cleanup all GPS watches on unmount
@@ -359,6 +435,12 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     setGpsError(null); setHasArrived(false);
     setNavTarget(zona);
     setIsNavigating(true);
+    setNavSteps([]); setCurrentStepIdx(0); setCurrentInstruction(null);
+    spokenStepsRef.current = new Set();
+    approachingSpokenRef.current = false;
+
+    // Unlock speech synthesis on user gesture (iOS requirement)
+    try { const u = new SpeechSynthesisUtterance(''); u.volume = 0; window.speechSynthesis?.speak(u); } catch(_) {}
 
     // Get initial position
     navigator.geolocation.getCurrentPosition(
@@ -372,6 +454,15 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
         if (result) {
           setNavRoute(result.coords);
           setNavInfo({ distance: result.distance, duration: result.duration });
+          setNavSteps(result.steps);
+          setCurrentStepIdx(0);
+          spokenStepsRef.current = new Set();
+          // Speak first instruction
+          if (result.steps.length > 0 && voiceEnabled) {
+            speakNav(result.steps[0].instruction);
+            setCurrentInstruction(result.steps[0].instruction);
+            spokenStepsRef.current.add(0);
+          }
         } else {
           setGpsError('No se pudo calcular la ruta. Intenta de nuevo.');
         }
@@ -417,6 +508,10 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     setNavInfo(null);
     setNavTarget(null);
     setHasArrived(false);
+    setNavSteps([]); setCurrentStepIdx(0); setCurrentInstruction(null);
+    spokenStepsRef.current = new Set();
+    approachingSpokenRef.current = false;
+    try { window.speechSynthesis?.cancel(); } catch(_) {}
   }, []);
 
   // Re-routing & arrival detection effect
@@ -435,14 +530,41 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
       setNavRoute(null);
       setNavInfo(null);
       setZoneName(navTarget.nombre);
-      // Haptic feedback on arrival
+      if (voiceEnabled) speakNav(`Has llegado a ${navTarget.nombre}`);
       try { navigator.vibrate?.(200); } catch(_) {}
-      // Stop rerouting
       if (rerouteTimerRef.current !== null) {
         clearInterval(rerouteTimerRef.current);
         rerouteTimerRef.current = null;
       }
       return;
+    }
+
+    // Approaching destination alert
+    if (distToDest < 300 && !approachingSpokenRef.current && voiceEnabled) {
+      speakNav('Te estás acercando a tu destino');
+      setCurrentInstruction('Te estás acercando a tu destino');
+      approachingSpokenRef.current = true;
+    }
+
+    // Step-by-step voice monitoring
+    if (navSteps.length > 0 && currentStepIdx < navSteps.length) {
+      const step = navSteps[currentStepIdx];
+      const distToStep = haversineDistance(
+        { lat: userPosition[0], lng: userPosition[1] },
+        { lat: step.location[0], lng: step.location[1] }
+      );
+      if (distToStep < 80 && !spokenStepsRef.current.has(currentStepIdx)) {
+        if (voiceEnabled) speakNav(step.instruction);
+        spokenStepsRef.current.add(currentStepIdx);
+        setCurrentStepIdx(prev => prev + 1);
+        // Show next instruction if available
+        const nextIdx = currentStepIdx + 1;
+        if (nextIdx < navSteps.length) {
+          setCurrentInstruction(navSteps[nextIdx].instruction);
+        }
+      } else if (distToStep >= 80) {
+        setCurrentInstruction(`En ${formatDistance(distToStep)}, ${step.instruction.toLowerCase()}`);
+      }
     }
 
     // Set up re-routing interval
@@ -454,6 +576,9 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
       if (result) {
         setNavRoute(result.coords);
         setNavInfo({ distance: result.distance, duration: result.duration });
+        setNavSteps(result.steps);
+        setCurrentStepIdx(0);
+        spokenStepsRef.current = new Set();
       }
     }, REROUTE_INTERVAL);
 
@@ -608,6 +733,13 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
           {/* Navigation Banner — Glass */}
           {isNavigating && !hasArrived && navInfo && (
             <div className="px-5 py-4 border-b border-blue-400/30" style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.92), rgba(79,70,229,0.92))', backdropFilter: 'blur(12px)' }}>
+              {/* Current instruction bar */}
+              {currentInstruction && (
+                <div className="flex items-center gap-2 mb-3 bg-white/10 rounded-xl px-3 py-2">
+                  <span className="text-lg">{navSteps[currentStepIdx] ? getManeuverIcon(navSteps[currentStepIdx].maneuverType, navSteps[currentStepIdx].modifier) : '⬆'}</span>
+                  <p className="text-sm text-white font-medium flex-1">{currentInstruction}</p>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center"><Compass className="w-6 h-6 text-white animate-pulse" /></div>
@@ -616,7 +748,10 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                     <p className="text-base font-bold text-white">{navTarget?.nombre}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setVoiceEnabled(v => !v)} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-all active:scale-90" title={voiceEnabled ? 'Silenciar voz' : 'Activar voz'}>
+                    {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  </button>
                   <div className="text-right">
                     <p className="text-2xl font-black text-white leading-none">{formatDistance(navInfo.distance)}</p>
                     <p className="text-xs text-blue-200 font-bold">{formatDuration(navInfo.duration)}</p>
