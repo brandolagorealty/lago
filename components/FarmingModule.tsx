@@ -581,12 +581,6 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
           )}
 
           <div style={{ height: '55vh', minHeight: 350, position: 'relative' }}>
-            {/* Center on Me floating button */}
-            {(isNavigating || isTracking) && userPosition && (
-              <button onClick={() => setCenterTrigger(t => t + 1)} className="absolute top-3 right-3 z-[1000] bg-white shadow-lg shadow-slate-300/50 rounded-2xl p-3 hover:bg-slate-50 active:scale-95 transition-all border border-slate-200" title="Centrar en mi posición">
-                <Crosshair className="w-5 h-5 text-blue-600" />
-              </button>
-            )}
             <MapContainer center={MARACAIBO_CENTER} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
               <TileLayer attribution='&copy; OSM' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <RecenterMap position={isTracking ? userPosition : null} />
@@ -629,7 +623,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 </Polygon>
               ))}
 
-              {/* Past routes — only rendered when history is toggled to avoid 100s of polylines */}
+              {/* Past routes — only rendered when history is toggled */}
               {showHistory && recorridos.map(r => r.coordenadas_ruta && r.coordenadas_ruta.length > 1 && (
                 <Polyline key={r.id} positions={r.coordenadas_ruta.map((c: any) => [c.lat, c.lng] as [number,number])} pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.4, dashArray: '8 6' }} />
               ))}
@@ -644,12 +638,19 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                 </Marker>
               ))}
             </MapContainer>
+
+            {/* Center on Me floating button — AFTER MapContainer to ensure it renders on top of Leaflet layers */}
+            {(isNavigating || isTracking) && userPosition && (
+              <button onClick={() => setCenterTrigger(t => t + 1)} style={{ position: 'absolute', top: 12, right: 12, zIndex: 9999 }} className="bg-white shadow-lg shadow-slate-300/50 rounded-2xl p-3 hover:bg-slate-50 active:scale-95 transition-all border border-slate-200" title="Centrar en mi posición">
+                <Crosshair className="w-5 h-5 text-blue-600" />
+              </button>
+            )}
           </div>
 
           {/* Controls */}
           <div className="px-4 py-4 border-t border-slate-100 flex items-center gap-3 flex-wrap">
             {!isTracking ? (
-              <button onClick={startTracking} disabled={isSaving} className="flex-1 min-w-[200px] bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3">
+              <button onClick={startTracking} disabled={isSaving || isNavigating} className="flex-1 min-w-[200px] bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3">
                 <Play className="w-6 h-6" /> {isSaving ? 'Iniciando...' : 'Iniciar Recorrido'}
               </button>
             ) : (
@@ -661,6 +662,11 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
                   <Plus className="w-6 h-6" /> Inmueble
                 </button>
               </>
+            )}
+            {(isNavigating || isTracking) && userPosition && (
+              <button onClick={() => setCenterTrigger(t => t + 1)} className={`p-4 rounded-2xl transition-colors bg-blue-100 text-blue-600 hover:bg-blue-200`} title="Centrar en mi posición">
+                <Crosshair className="w-6 h-6" />
+              </button>
             )}
             <button onClick={() => setShowHeatmap(!showHeatmap)} className={`p-4 rounded-2xl transition-colors ${showHeatmap ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} title="Mapa de Calor">
               <Flame className="w-6 h-6" />
