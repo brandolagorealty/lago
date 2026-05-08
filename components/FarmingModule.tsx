@@ -243,7 +243,7 @@ interface BitacoraSectionProps {
   expandedZones: Record<string, boolean>;
   setExpandedZones: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   onDelete?: (id: string) => void;
-  onEdit?: (id: string, updates: { reporte: ReporteInteligencia }) => void;
+  onEdit?: (id: string, updates: { reporte?: ReporteInteligencia; zona_nombre?: string }) => void;
 }
 
 function BitacoraSection({ recorridos, isAdmin, currentUserId, bitacoraFilter, setBitacoraFilter, expandedZones, setExpandedZones, onDelete, onEdit }: BitacoraSectionProps) {
@@ -251,6 +251,7 @@ function BitacoraSection({ recorridos, isAdmin, currentUserId, bitacoraFilter, s
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ReporteInteligencia>({ ...DEFAULT_REPORT });
+  const [editZonaNombre, setEditZonaNombre] = useState<string>('');
 
   const filteredRecs = isAdmin && bitacoraFilter !== 'all'
     ? recorridos.filter(r => r.agente_id === bitacoraFilter)
@@ -345,7 +346,7 @@ function BitacoraSection({ recorridos, isAdmin, currentUserId, bitacoraFilter, s
                           </div>
                           {(isAdmin || r.agente_id === currentUserId) && (
                             <div className="shrink-0 pt-0.5 flex flex-col gap-1">
-                              <button onClick={() => { setEditingId(r.id); setEditForm(r.reporte ? { ...r.reporte } : { ...DEFAULT_REPORT }); }} className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors" title="Editar reporte">
+                              <button onClick={() => { setEditingId(r.id); setEditForm(r.reporte ? { ...r.reporte } : { ...DEFAULT_REPORT }); setEditZonaNombre(r.zona_nombre || 'Sin nombre'); }} className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors" title="Editar reporte">
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               {confirmDelete === r.id ? (
@@ -380,6 +381,7 @@ function BitacoraSection({ recorridos, isAdmin, currentUserId, bitacoraFilter, s
               <button onClick={() => setEditingId(null)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
+              <label className="block"><span className="text-xs font-bold text-slate-500">📍 Nombre de la Zona</span><input type="text" value={editZonaNombre} onChange={e => setEditZonaNombre(e.target.value)} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" placeholder="Ej. Sector Belloso" /></label>
               <label className="block"><span className="text-xs font-bold text-slate-500">🏠 Carteles de Dueños</span><select value={editForm.carteles_duenos} onChange={e => setEditForm({...editForm, carteles_duenos: e.target.value as any})} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm"><option value="0">0</option><option value="1-3">1-3</option><option value="4-10">4-10</option><option value="10+">10+</option></select></label>
               <label className="block"><span className="text-xs font-bold text-slate-500">🏷️ Carteles Competencia</span><select value={editForm.carteles_competencia} onChange={e => setEditForm({...editForm, carteles_competencia: e.target.value as any})} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm"><option value="0">0</option><option value="1-3">1-3</option><option value="4-10">4-10</option><option value="10+">10+</option></select></label>
               <label className="block"><span className="text-xs font-bold text-slate-500">🏚️ Inmuebles Abandonados</span><select value={editForm.inmuebles_abandonados} onChange={e => setEditForm({...editForm, inmuebles_abandonados: e.target.value as any})} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm"><option value="0">0</option><option value="1-3">1-3</option><option value="4-10">4-10</option><option value="10+">10+</option></select></label>
@@ -392,7 +394,7 @@ function BitacoraSection({ recorridos, isAdmin, currentUserId, bitacoraFilter, s
             </div>
             <div className="flex gap-2 pt-2">
               <button onClick={() => setEditingId(null)} className="flex-1 py-2.5 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
-              <button onClick={() => { onEdit?.(editingId, { reporte: editForm }); setEditingId(null); }} className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">Guardar</button>
+              <button onClick={() => { onEdit?.(editingId, { reporte: editForm, zona_nombre: editZonaNombre }); setEditingId(null); }} className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">Guardar</button>
             </div>
           </div>
         </div>
@@ -726,7 +728,7 @@ export default function FarmingModule({ currentUserRole, userRoles }: FarmingPro
     else setGpsError('Error al eliminar: ' + (result.error || 'Desconocido'));
   }, []);
 
-  const handleEditRecorrido = useCallback(async (id: string, updates: { reporte: ReporteInteligencia }) => {
+  const handleEditRecorrido = useCallback(async (id: string, updates: { reporte?: ReporteInteligencia; zona_nombre?: string }) => {
     const result = await propertyService.updateRecorrido(id, updates);
     if (result.success) loadData();
     else setGpsError('Error al editar: ' + (result.error || 'Desconocido'));
