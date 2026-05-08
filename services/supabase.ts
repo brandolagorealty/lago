@@ -926,6 +926,14 @@ export const propertyService = {
     return { success: true };
   },
 
+  // Update a recorrido (edit report, zona_nombre, etc.)
+  async updateRecorrido(id: string, updates: Partial<{ zona_nombre: string; reporte: import('../types').ReporteInteligencia }>): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+    const { error } = await supabase.from('recorridos').update(updates).eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
   // Get all recorridos (visible to all team)
   async getRecorridos(): Promise<import('../types').Recorrido[]> {
     if (!supabase) return [];
