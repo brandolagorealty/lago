@@ -909,6 +909,20 @@ export const propertyService = {
     }
     const { error } = await supabase.from('recorridos').update(updatePayload).eq('id', id);
     if (error) return { success: false, error: error.message };
+
+    // Update km_recorridos on the matching zona
+    try {
+      const { data: rec } = await supabase.from('recorridos').select('zona_nombre').eq('id', id).single();
+      if (rec?.zona_nombre) {
+        const { data: zona } = await supabase.from('zonas_farming').select('id, km_recorridos').eq('nombre', rec.zona_nombre).single();
+        if (zona) {
+          await supabase.from('zonas_farming').update({
+            km_recorridos: (zona.km_recorridos || 0) + distancia_metros
+          }).eq('id', zona.id);
+        }
+      }
+    } catch (e) { console.warn('Could not update zone km:', e); }
+
     return { success: true };
   },
 
