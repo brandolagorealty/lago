@@ -13,5 +13,6 @@ export const MARACAIBO_SECTORS = [
     'La Limpia',
     'Santa Lucía',
     'Valle Frio',
-    'Juana de Avila'
+    'Juana de Avila',
+    'Canchancha'
 ];
