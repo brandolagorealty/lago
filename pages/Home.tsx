@@ -101,11 +101,9 @@ const Home: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                         {isLoading
-                            ? Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)
-                            : (properties.filter(p => p.featured).length > 0 
-                                ? properties.filter(p => p.featured) 
-                                : properties
-                              ).slice(0, 4).map(property => (
+                            ? Array(8).fill(0).map((_, i) => <SkeletonCard key={i} />)
+                            : [...properties].sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0))
+                              .slice(0, 8).map(property => (
                                 <PropertyCard key={property.id} property={property} />
                             ))
                         }

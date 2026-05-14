@@ -33,7 +33,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
 
   return (
     <div
-      className="group bg-brand-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-brand-black/5 flex flex-col h-full cursor-pointer"
+      className={`group bg-brand-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border flex flex-col h-full cursor-pointer ${property.featured ? 'border-brand-green ring-1 ring-brand-green/50 shadow-brand-green/10' : 'border-brand-black/5'}`}
       onClick={() => navigate(`/property/${property.id}`)}
     >
       <div className="relative h-64 overflow-hidden">
