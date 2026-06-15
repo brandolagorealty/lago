@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { marked } from 'marked';
-import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy, Home, Sofa, X, Car } from 'lucide-react';
+import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy, Home, Sofa, X, Car, DollarSign, Key } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../services/supabase';
 import { MARACAIBO_SECTORS } from '../constants/locations';
@@ -22,6 +22,7 @@ const AppraiserModule: React.FC = () => {
     const [copied, setCopied] = useState(false);
 
     const [formData, setFormData] = useState({
+        tipoOperacion: 'venta' as 'venta' | 'alquiler',
         tipoInmueble: '',
         ubicacion: '',
         customUbicacion: '',
@@ -115,6 +116,8 @@ const AppraiserModule: React.FC = () => {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
     };
 
+    const isAlquiler = formData.tipoOperacion === 'alquiler';
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -173,6 +176,7 @@ const AppraiserModule: React.FC = () => {
             const nivelesStr = (formData.tipoInmueble === 'Casa' || formData.tipoInmueble === 'Townhouse') ? `, Niveles: ${formData.niveles}` : '';
 
             const payload = {
+                tipoOperacion: formData.tipoOperacion,
                 ubicacion: ubicacionFinal,
                 superficie: formData.superficie,
                 distribucion: `Tipo: ${formData.tipoInmueble}${nivelesStr}, Distribución: ${formData.distribucion}, Estacionamiento: ${formData.estacionamiento} puestos`,
@@ -225,6 +229,41 @@ const AppraiserModule: React.FC = () => {
                         <h3 className="font-bold text-slate-800 text-lg">Datos de Inspección</h3>
                     </div>
                     <form onSubmit={handleSubmit} className="p-6 space-y-5">
+
+                        {/* TIPO DE OPERACIÓN */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <DollarSign className="w-4 h-4 text-slate-400" />
+                                Tipo de Operación
+                            </label>
+                            <div className="grid grid-cols-2 gap-0 bg-slate-100 rounded-xl p-1 border border-slate-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, tipoOperacion: 'venta' }))}
+                                    className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        formData.tipoOperacion === 'venta'
+                                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <DollarSign className="w-4 h-4" />
+                                    Venta
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, tipoOperacion: 'alquiler' }))}
+                                    className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        formData.tipoOperacion === 'alquiler'
+                                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <Key className="w-4 h-4" />
+                                    Alquiler
+                                </button>
+                            </div>
+                        </div>
+
                         
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
@@ -550,12 +589,12 @@ const AppraiserModule: React.FC = () => {
                             {isLoading ? (
                                 <>
                                     <RotateCw className="w-5 h-5 animate-spin" />
-                                    Evaluando Mercado...
+                                    {isAlquiler ? 'Evaluando Canon...' : 'Evaluando Mercado...'}
                                 </>
                             ) : (
                                 <>
                                     <Calculator className="w-5 h-5 text-orange-400" />
-                                    Generar Tasación Pericial
+                                    {isAlquiler ? 'Generar Tasación de Alquiler' : 'Generar Tasación de Venta'}
                                 </>
                             )}
                         </button>
@@ -571,24 +610,24 @@ const AppraiserModule: React.FC = () => {
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-orange-100/50 to-transparent rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none"></div>
                                 
                                 <h4 className="text-sm font-bold tracking-widest text-orange-500 uppercase mb-6 flex items-center gap-2">
-                                    <CheckCircle2 className="w-4 h-4" /> Valores Estimados
+                                    <CheckCircle2 className="w-4 h-4" /> {isAlquiler ? 'Canon de Alquiler Estimado' : 'Valores Estimados'}
                                 </h4>
                                 
                                 <div className="flex flex-col items-center text-center mb-8">
-                                    <span className="text-slate-400 font-medium mb-2">Valor Base Sugerido</span>
+                                    <span className="text-slate-400 font-medium mb-2">{isAlquiler ? 'Canon Mensual Sugerido' : 'Valor Base Sugerido'}</span>
                                     <span className="text-6xl font-black text-slate-900 tracking-tighter">
-                                        {formatCurrency(result.suggestedValue.base)}
+                                        {formatCurrency(result.suggestedValue.base)}{isAlquiler && <span className="text-2xl text-slate-400 font-medium">/mes</span>}
                                     </span>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
-                                        <span className="block text-sm text-slate-400 font-medium mb-1">Precio Oportunidad</span>
-                                        <span className="block text-2xl font-bold text-slate-700">{formatCurrency(result.suggestedValue.low)}</span>
+                                        <span className="block text-sm text-slate-400 font-medium mb-1">{isAlquiler ? 'Canon Mínimo' : 'Precio Oportunidad'}</span>
+                                        <span className="block text-2xl font-bold text-slate-700">{formatCurrency(result.suggestedValue.low)}{isAlquiler && <span className="text-sm text-slate-400">/mes</span>}</span>
                                     </div>
                                     <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
-                                        <span className="block text-sm text-slate-400 font-medium mb-1">Precio Optimista</span>
-                                        <span className="block text-2xl font-bold text-slate-700">{formatCurrency(result.suggestedValue.high)}</span>
+                                        <span className="block text-sm text-slate-400 font-medium mb-1">{isAlquiler ? 'Canon Premium' : 'Precio Optimista'}</span>
+                                        <span className="block text-2xl font-bold text-slate-700">{formatCurrency(result.suggestedValue.high)}{isAlquiler && <span className="text-sm text-slate-400">/mes</span>}</span>
                                     </div>
                                 </div>
                             </div>

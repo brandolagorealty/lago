@@ -4,7 +4,9 @@ export const handler = async (event: any) => {
     }
 
     try {
-        const { ubicacion, superficie, distribucion, estado, extras } = JSON.parse(event.body);
+        const { ubicacion, superficie, distribucion, estado, extras, tipoOperacion } = JSON.parse(event.body);
+        
+        const isAlquiler = tipoOperacion === 'alquiler';
         
         // Priority: new unified key > old dedicated appraiser key
         const API_KEY = process.env.GEMINI_API_KEY 
@@ -17,7 +19,39 @@ export const handler = async (event: any) => {
             };
         }
 
-        const systemInstructions = `
+        const systemInstructions = isAlquiler ? `
+Actúa como un Perito Evaluador Inmobiliario experto en el mercado de ALQUILERES de Maracaibo, Zulia, Venezuela.
+Tu objetivo es redactar un informe de valoración de CANON DE ALQUILER MENSUAL profesional basado en los datos de inspección proporcionados.
+
+ESTRUCTURA DEL INFORME REQUERIDA (en formato Markdown):
+1. **Identificación:** Ubicación exacta y descripción del entorno en Maracaibo.
+2. **Memoria Descriptiva:** Detalles constructivos y estado de conservación basado en los datos.
+3. **Análisis de Mercado de Alquileres:** Evaluación de la demanda de alquiler en la zona, perfil de inquilinos potenciales, oferta comparable.
+4. **Metodología de Valoración de Canon:** Aplicación del método de comparación de mercado para alquileres. Considera factores como equipamiento incluido, servicios, estado del inmueble y su impacto en el canon mensual.
+5. **Conclusión:** Canon de alquiler mensual sugerido en USD y consideraciones (duración recomendada de contrato, depósito sugerido, si se recomienda alquilar amoblado o no).
+
+IMPORTANTE:
+- Todos los valores deben ser CANON MENSUAL en USD (no precio de venta).
+- Los valores deben ser realistas para el mercado de alquileres de Maracaibo 2024-2026.
+- El rango típico de alquiler mensual en Maracaibo va desde $80-$150 para apartamentos modestos hasta $800-$2500+ para propiedades premium.
+
+TONO Y ESTILO:
+- Utiliza un lenguaje técnico-jurídico pero claro.
+- Mantén un tono objetivo e imparcial.
+- Organiza la información en secciones con encabezados en negrita (usando hashes en Markdown \`##\`).
+
+INSTRUCCIÓN ESPECIAL PARA LA SALIDA:
+Devuelve un JSON estrictamente válido con la siguiente estructura:
+{
+  "markdownReport": "Aquí va el informe completo en texto markdown, usando saltos de línea \\n",
+  "suggestedValue": {
+    "base": (canon mensual estimado principal en USD),
+    "high": (canon mensual estimado premium en USD),
+    "low": (canon mensual estimado mínimo en USD)
+  }
+}
+NO DEVUELVAS NADA MÁS QUE EL JSON. Asegúrate de que los valores sean números enteros.
+        ` : `
 Actúa como un Perito Evaluador Inmobiliario experto en el mercado inmobiliario de Maracaibo, Zulia, Venezuela.
 Tu objetivo es redactar un informe de valoración profesional basado en los datos de inspección proporcionados.
 
@@ -44,9 +78,13 @@ Devuelve un JSON estrictamente válido con la siguiente estructura:
   }
 }
 NO DEVUELVAS NADA MÁS QUE EL JSON. Asegúrate de que los valores sean números enteros.
-    `;
+        `;
+
+        const operacionLabel = isAlquiler ? 'ALQUILER (Canon Mensual)' : 'VENTA';
 
         const prompt = `
+TIPO DE OPERACIÓN: ${operacionLabel}
+
 DATOS DE INSPECCIÓN DEL INMUEBLE:
 - Ubicación / Sector: ${ubicacion}
 - Superficie: ${superficie}
@@ -54,8 +92,8 @@ DATOS DE INSPECCIÓN DEL INMUEBLE:
 - Edad / Estado: ${estado}
 - Extras: ${extras || 'Ninguno'}
 
-Redacta el informe de valoración siguiendo estrictamente el esquema JSON solicitado y las instrucciones de experto.
-    `;
+Redacta el informe de valoración ${isAlquiler ? 'de canon de alquiler mensual' : 'de venta'} siguiendo estrictamente el esquema JSON solicitado y las instrucciones de experto.
+        `;
 
         // Fallback chain: newest → oldest. Whatever the API key supports, one will work.
         const modelsToTry = [
