@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FilterState } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
-import { MARACAIBO_SECTORS } from '../constants/locations';
+import { LOCATION_GROUPS } from '../constants/locations';
 import CustomSelect from './CustomSelect';
 
 interface HeroProps {
@@ -56,7 +56,10 @@ const Hero: React.FC<HeroProps> = ({ onSearch }) => {
             label={t.hero.search.location}
             value={filters.location}
             placeholder={t.hero.search.locationPlaceholder}
-            options={MARACAIBO_SECTORS.map(s => ({ label: s, value: s }))}
+            options={LOCATION_GROUPS.flatMap(g => [
+              { label: `── ${g.municipality} ──`, value: `__group_${g.municipality}`, disabled: true },
+              ...g.sectors.map(s => ({ label: s, value: s }))
+            ])}
             onChange={(val) => setFilters({ ...filters, location: val })}
           />
           <CustomSelect

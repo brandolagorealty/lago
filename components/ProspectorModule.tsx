@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Globe, AlertTriangle, User, Building, MapPin, Tag, Filter, ExternalLink, BedDouble, Bath, ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
-import { MARACAIBO_SECTORS } from '../constants/locations';
+import { LOCATION_GROUPS } from '../constants/locations';
 
 interface ProspectResult {
   title: string;
@@ -144,7 +144,11 @@ export default function ProspectorModule() {
                         <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-400"/>Sector / Zona</label>
                         <select name="ubicacion" value={formData.ubicacion} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium appearance-none">
                             <option value="">Cualquier sector (Búsqueda amplia)</option>
-                            {MARACAIBO_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                            {LOCATION_GROUPS.map(g => (
+                                <optgroup key={g.municipality} label={`── ${g.municipality} ──`}>
+                                    {g.sectors.map(s => <option key={s} value={s}>{s}</option>)}
+                                </optgroup>
+                            ))}
                             <option value="Otro">📍 Otro sector...</option>
                         </select>
                     </div>

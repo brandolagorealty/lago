@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import { Calculator, CheckCircle2, RotateCw, AlertTriangle, Building, MapPin, Ruler, BedDouble, Plus, Copy, Home, Sofa, X, Car, DollarSign, Key } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../services/supabase';
-import { MARACAIBO_SECTORS } from '../constants/locations';
+import { LOCATION_GROUPS } from '../constants/locations';
 
 interface AppraiserResult {
     markdownReport: string;
@@ -301,8 +301,12 @@ const AppraiserModule: React.FC = () => {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium appearance-none"
                             >
                                 <option value="" disabled>Seleccionar Sector...</option>
-                                {MARACAIBO_SECTORS.map(sector => (
-                                    <option key={sector} value={sector}>{sector}</option>
+                                {LOCATION_GROUPS.map(g => (
+                                    <optgroup key={g.municipality} label={`── ${g.municipality} ──`}>
+                                        {g.sectors.map(sector => (
+                                            <option key={sector} value={sector}>{sector}</option>
+                                        ))}
+                                    </optgroup>
                                 ))}
                                 <option value="Otro">Otro sector...</option>
                             </select>

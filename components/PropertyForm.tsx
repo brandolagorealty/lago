@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Property } from '../types';
 import { propertyService } from '../services/supabase';
 import { useLanguage } from '../i18n/LanguageContext';
-import { MARACAIBO_SECTORS } from '../constants/locations';
+import { LOCATION_GROUPS } from '../constants/locations';
 import imageCompression from 'browser-image-compression';
 
 interface PropertyFormProps {
@@ -227,10 +227,14 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSave, initialDat
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             >
               <option value="">{t.form.placeholders.location}</option>
-              {MARACAIBO_SECTORS.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
+              {LOCATION_GROUPS.map((group) => (
+                <optgroup key={group.municipality} label={`── ${group.municipality} ──`}>
+                  {group.sectors.map((sector) => (
+                    <option key={sector} value={sector}>
+                      {sector}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

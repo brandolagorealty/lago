@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 interface CustomSelectProps {
   label: string;
   value: string;
-  options: { label: string; value: string }[];
+  options: { label: string; value: string; disabled?: boolean }[];
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
@@ -52,8 +52,13 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
             {options.map((option) => (
               <div
                 key={option.value}
-                className={`px-4 py-3 text-sm font-semibold cursor-pointer transition-all duration-200 hover:bg-brand-green hover:text-white ${value === option.value ? 'bg-brand-green/10 text-brand-green' : 'text-brand-black'}`}
+                className={`px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+                  option.disabled
+                    ? 'text-slate-400 text-xs font-bold uppercase tracking-wider cursor-default bg-slate-50 py-2'
+                    : `cursor-pointer hover:bg-brand-green hover:text-white ${value === option.value ? 'bg-brand-green/10 text-brand-green' : 'text-brand-black'}`
+                }`}
                 onClick={() => {
+                  if (option.disabled) return;
                   onChange(option.value);
                   setIsOpen(false);
                 }}
