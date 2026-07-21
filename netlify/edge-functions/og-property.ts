@@ -96,15 +96,15 @@ export default async (request: Request, context: Context) => {
         /<meta property="og:description" content=".*?">/,
         `<meta property="og:description" content="${escapeHtml(ogDescription)}">`
       )
-      // OG Image
+      // OG Image (No escapamos HTML aquí para no generar &amp; que rompa a WhatsApp)
       .replace(
         /<meta property="og:image" content=".*?">/,
-        `<meta property="og:image" content="${escapeHtml(ogImage)}">`
+        `<meta property="og:image" content="${ogImage}">`
       )
-      // OG URL
+      // OG URL (No escapamos HTML aquí tampoco)
       .replace(
         /<meta property="og:url" content=".*?">/,
-        `<meta property="og:url" content="${escapeHtml(ogUrl)}">`
+        `<meta property="og:url" content="${ogUrl}">`
       )
       // OG Type — property page is an "article"
       .replace(
@@ -125,6 +125,7 @@ export default async (request: Request, context: Context) => {
 };
 
 function escapeHtml(str: string): string {
+  if (!str) return "";
   return str
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
