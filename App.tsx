@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
@@ -13,6 +13,7 @@ import Contact from './pages/Contact';
 import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
 import LoadingScreen from './components/LoadingScreen';
+import FloatingWhatsApp from './components/FloatingWhatsApp';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -27,10 +28,19 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+// Component to handle conditional global UI
+const GlobalUI: React.FC = () => {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  
+  return !isAdminRoute ? <FloatingWhatsApp /> : null;
+};
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <Router>
+        <GlobalUI />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
