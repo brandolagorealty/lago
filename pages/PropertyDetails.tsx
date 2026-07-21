@@ -291,7 +291,7 @@ const PropertyDetails: React.FC = () => {
                     </div>
                 </div>
             </main>
-            <AiAssistant properties={property ? [property] : []} />
+            {/* <AiAssistant properties={property ? [property] : []} /> */}
             <Footer />
         </div>
     );

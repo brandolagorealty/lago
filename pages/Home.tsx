@@ -159,7 +159,7 @@ const Home: React.FC = () => {
                 {currentView === 'contact' && <div className="pt-32 p-8 text-center text-slate-500">{t.navbar.contact} - Coming Soon</div>}
             </main>
 
-            <AiAssistant properties={properties} />
+            {/* <AiAssistant properties={properties} /> */}
             <Footer />
         </div>
     );
