@@ -21,8 +21,8 @@ export const en: Translations = {
         listProperty: 'List Property',
     },
     hero: {
-        title: 'Find Your Paradise in Zulia',
-        subtitle: 'The most exclusive portfolio of luxury homes, lakeside villas, and commercial opportunities in Western Venezuela.',
+        title: 'Your Next Big\nInvestment Starts Here',
+        subtitle: 'Exclusive properties in Zulia. Personalized advisory, professional audiovisual production, and cutting-edge technology to buy, sell, or rent — faster.',
         stats_years: 'Years of Experience',
         stats_volume: 'Volume Managed',
         search: {

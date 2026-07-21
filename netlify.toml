@@ -26,3 +26,10 @@
 
 [functions."appraiser"]
   timeout = 26
+
+# Edge Function: Open Graph dinámico para páginas de propiedad
+# Inyecta og:title, og:image, og:description con datos reales cuando
+# WhatsApp, Facebook, Telegram u otro crawler solicita /property/:id
+[[edge_functions]]
+  path = "/property/*"
+  function = "og-property"

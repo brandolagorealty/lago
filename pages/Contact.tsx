@@ -10,6 +10,12 @@ const Contact: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
+    // SEO: Dynamic page title
+    useEffect(() => {
+        document.title = 'Contacto | Lago Realty — Inmobiliaria en Maracaibo, Zulia';
+        return () => { document.title = 'Lago Realty | Inmobiliaria Premium en el Zulia, Venezuela'; };
+    }, []);
+
     useEffect(() => {
         if (toast) {
             const timer = setTimeout(() => setToast(null), 4000);
@@ -153,7 +159,7 @@ const Contact: React.FC = () => {
                                         </div>
                                         <div>
                                             <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Phone</p>
-                                            <p className="text-sm font-light">+58 424 6888229</p>
+                                            <p className="text-sm font-light">+58 424 6926562</p>
                                         </div>
                                     </div>
 

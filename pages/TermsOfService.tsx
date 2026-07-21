@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const TermsOfService: React.FC = () => {
     const { t } = useLanguage();
+
+    // SEO: Dynamic page title
+    useEffect(() => {
+        document.title = 'Términos y Condiciones | Lago Realty';
+        return () => { document.title = 'Lago Realty | Inmobiliaria Premium en el Zulia, Venezuela'; };
+    }, []);
 
     return (
         <div className="min-h-screen bg-brand-white flex flex-col">

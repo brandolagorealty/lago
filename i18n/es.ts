@@ -21,8 +21,8 @@ export const es: Translations = {
         listProperty: 'Publicar Propiedad',
     },
     hero: {
-        title: 'Encuentra tu Paraíso',
-        subtitle: 'El portafolio más exclusivo de casas de lujo, villas y oportunidades comerciales en el occidente de Venezuela.',
+        title: 'Tu Próxima Gran\nInversión Comienza Aquí',
+        subtitle: 'Propiedades exclusivas en el Zulia. Asesoría personalizada, producción audiovisual profesional y tecnología de punta para comprar, vender o alquilar más rápido.',
         stats_years: 'Años de Experiencia',
         stats_volume: 'Volumen Gestionado',
         search: {

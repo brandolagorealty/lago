@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /reset-password
+Disallow: /forgot-password
+
+Sitemap: https://lagorealty.com.ve/sitemap.xml

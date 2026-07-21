@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const PrivacyPolicy: React.FC = () => {
     const { t } = useLanguage();
+
+    // SEO: Dynamic page title
+    useEffect(() => {
+        document.title = 'Política de Privacidad | Lago Realty';
+        return () => { document.title = 'Lago Realty | Inmobiliaria Premium en el Zulia, Venezuela'; };
+    }, []);
 
     return (
         <div className="min-h-screen bg-brand-white flex flex-col">
