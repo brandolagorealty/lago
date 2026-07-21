@@ -21,8 +21,8 @@ export default async (request: Request, context: Context) => {
   }
 
   // Fetch property data from Supabase REST API
-  const supabaseUrl = Deno.env.get("VITE_SUPABASE_URL");
-  const supabaseKey = Deno.env.get("VITE_SUPABASE_ANON_KEY");
+  const supabaseUrl = Netlify.env.get("VITE_SUPABASE_URL");
+  const supabaseKey = Netlify.env.get("VITE_SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseKey) {
     console.error("[OG Edge] Missing Supabase env vars");
@@ -60,9 +60,14 @@ export default async (request: Request, context: Context) => {
     const listingLabel = property.listing_type === "rent" ? "Alquiler" : "Venta";
     const ogTitle = `${property.title} — ${price} | Lago Realty`;
     const ogDescription = property.short_description || property.description?.substring(0, 160) || `Propiedad en ${listingLabel} en ${property.location}. Conoce los detalles en Lago Realty.`;
-    const ogImage = property.image_url?.startsWith("http")
+    const rawImageUrl = property.image_url?.startsWith("http")
       ? property.image_url
       : `${supabaseUrl}/storage/v1/object/public/${property.image_url}`;
+    
+    // Usamos un proxy de imágenes para redimensionar a 1200x630 (ideal para WhatsApp)
+    // y arreglar problemas de parseo con espacios o paréntesis en la URL original
+    const encodedImageUrl = encodeURIComponent(rawImageUrl);
+    const ogImage = `https://wsrv.nl/?url=${encodedImageUrl}&w=1200&h=630&fit=cover&output=jpg&q=80`;
     const ogUrl = `https://lagorealty.com.ve/property/${propertyId}`;
 
     // Get the original HTML response
