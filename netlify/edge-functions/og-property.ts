@@ -126,7 +126,3 @@ function escapeHtml(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
-
-export const config = {
-  path: "/property/*",
-};
