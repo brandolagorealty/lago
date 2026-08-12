@@ -4,6 +4,7 @@ import Hero from '../components/Hero';
 import PropertyCard from '../components/PropertyCard';
 import SkeletonCard from '../components/SkeletonCard';
 import AboutSection from '../components/AboutSection';
+import BlogSection from '../components/BlogSection';
 import AiAssistant from '../components/AiAssistant';
 import Footer from '../components/Footer';
 import PropertyForm from '../components/PropertyForm';
@@ -110,6 +111,8 @@ const Home: React.FC = () => {
                     </div>
                 </div>
             </section>
+
+            <BlogSection />
 
             <AboutSection />
         </>

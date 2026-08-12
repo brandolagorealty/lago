@@ -54,6 +54,9 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             <button onClick={() => handleNav('about')} className={`text-sm font-bold transition-colors ${currentView === 'about' ? 'text-brand-green' : 'text-brand-black/70 hover:text-brand-black'}`}>
               {t.navbar.about}
             </button>
+            <Link to="/blog" className={`text-sm font-bold transition-colors ${window.location.pathname.startsWith('/blog') ? 'text-brand-green' : 'text-brand-black/70 hover:text-brand-black'}`}>
+              Blog
+            </Link>
             <Link to="/contact" className={`text-sm font-bold transition-colors ${window.location.pathname === '/contact' ? 'text-brand-green' : 'text-brand-black/70 hover:text-brand-black'}`}>
               {t.navbar.contact}
             </Link>
