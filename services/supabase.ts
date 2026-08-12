@@ -631,6 +631,108 @@ export const propertyService = {
   },
 
 
+  // =====================================================================
+  // BLOG POSTS
+  // =====================================================================
+
+  async getBlogPosts(publishedOnly: boolean = true): Promise<import('../types').BlogPost[]> {
+    if (!supabase) return [];
+    
+    let query = supabase
+      .from('blog_posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (publishedOnly) {
+      query = query.eq('is_published', true);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching blog posts:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async getBlogPostBySlug(slug: string): Promise<import('../types').BlogPost | null> {
+    if (!supabase) return null;
+    
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .select('*')
+      .eq('slug', slug)
+      .single();
+
+    if (error) {
+      console.error('Error fetching blog post:', error);
+      return null;
+    }
+    return data;
+  },
+
+  async createBlogPost(postData: Partial<import('../types').BlogPost>): Promise<{ success: boolean; data?: import('../types').BlogPost; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !postData.author_id) {
+      postData.author_id = user.id;
+    }
+
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .insert([postData])
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data };
+  },
+
+  async updateBlogPost(id: string, updates: Partial<import('../types').BlogPost>): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { error } = await supabase
+      .from('blog_posts')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  async deleteBlogPost(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+
+    const { error } = await supabase
+      .from('blog_posts')
+      .delete()
+      .eq('id', id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  },
+
+  async uploadBlogImage(file: File): Promise<string | null> {
+    if (!supabase) return null;
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('blog-images')
+      .upload(fileName, file, { contentType: file.type, upsert: true });
+
+    if (uploadError) {
+      console.error('Error uploading to blog-images:', uploadError.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('blog-images').getPublicUrl(fileName);
+    return data.publicUrl;
+  },
+
   // --- TASKS (JIRA CLONE) ---
 
   // Get all tasks

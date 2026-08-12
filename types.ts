@@ -199,3 +199,18 @@ export interface ZonaFarming {
   created_by?: string;
   created_at: string;
 }
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content_markdown: string;
+  image_url?: string;
+  author_id?: string;
+  read_time_minutes: number;
+  is_published: boolean;
+  published_at?: string;
+  created_at: string;
+  updated_at: string;
+}
