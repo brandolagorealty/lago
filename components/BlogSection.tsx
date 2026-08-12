@@ -32,9 +32,7 @@ const BlogSection: React.FC = () => {
     });
   };
 
-  if (!isLoading && posts.length === 0) {
-    return null; // Don't show section if no published posts exist
-  }
+  // Section always renders - shows empty state if no posts
 
   return (
     <section className="py-24 bg-slate-50 border-t border-slate-100">
@@ -60,6 +58,14 @@ const BlogSection: React.FC = () => {
             {[1, 2, 3].map((n) => (
               <div key={n} className="bg-white rounded-3xl h-96 animate-pulse shadow-sm border border-slate-100"></div>
             ))}
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="bg-white rounded-3xl p-16 text-center shadow-sm border border-slate-100 max-w-2xl mx-auto">
+            <svg className="w-16 h-16 mx-auto text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+            <h3 className="text-xl font-bold text-slate-700 mb-2">Próximamente</h3>
+            <p className="text-slate-400">Estamos preparando contenido de valor para ti. ¡Vuelve pronto!</p>
           </div>
         ) : (
           <>
@@ -124,7 +130,7 @@ const BlogSection: React.FC = () => {
               ))}
             </div>
 
-            {/* Bottom Button */}
+            {/* Bottom Button - Ver más */}
             <div className="mt-14 text-center">
               <Link 
                 to="/blog"

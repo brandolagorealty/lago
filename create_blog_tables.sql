@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS public.blog_posts (
 -- Habilitar Row Level Security (RLS)
 ALTER TABLE public.blog_posts ENABLE ROW LEVEL SECURITY;
 
+-- Permitir lectura a roles anónimo y autenticado (necesario para que las policies funcionen)
+GRANT SELECT ON public.blog_posts TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.blog_posts TO authenticated;
+
 -- Política: El público puede ver los posts publicados
 CREATE POLICY "Public can view published blog posts"
   ON public.blog_posts
