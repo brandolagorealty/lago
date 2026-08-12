@@ -45,7 +45,7 @@ const BlogList: React.FC = () => {
             Últimos <span className="text-brand-green">Artículos</span>
           </h1>
           <p className="text-slate-500 max-w-2xl mx-auto mb-16 text-lg">
-            Análisis, tendencias y consejos para tomar las mejores decisiones en bienes raíces
+            Todo lo que necesitas saber para invertir, vender o alquilar en Venezuela.
           </p>
 
           {isLoading ? (
