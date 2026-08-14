@@ -13,6 +13,7 @@
     "@google/genai": "^1.34.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/leaflet": "^1.9.21",
     "@uiw/react-md-editor": "^4.1.1",
     "browser-image-compression": "^2.0.2",

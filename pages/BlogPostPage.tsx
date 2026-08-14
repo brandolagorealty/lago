@@ -113,7 +113,21 @@ const BlogPostPage: React.FC = () => {
           <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-100 mb-12">
             
             {/* Markdown Content */}
-            <div className="prose prose-lg md:prose-xl prose-slate max-w-none prose-headings:font-serif prose-headings:text-[#1F3347] prose-headings:font-bold prose-h2:border-l-4 prose-h2:border-brand-green prose-h2:pl-4 prose-a:text-brand-green prose-img:rounded-xl">
+            <div className="
+              prose prose-lg md:prose-xl max-w-none 
+              prose-headings:font-serif prose-headings:text-[#1F3347] 
+              prose-h1:text-4xl prose-h1:md:text-5xl prose-h1:font-bold prose-h1:mb-10 
+              prose-h2:text-3xl prose-h2:font-bold prose-h2:text-brand-green prose-h2:border-b prose-h2:border-slate-100 prose-h2:pb-4 prose-h2:mt-16 prose-h2:mb-8 
+              prose-h3:text-2xl prose-h3:font-bold prose-h3:text-brand-black prose-h3:mt-12 
+              prose-p:text-slate-600 prose-p:leading-relaxed prose-p:mb-8 
+              prose-a:text-brand-green prose-a:font-bold prose-a:no-underline hover:prose-a:underline 
+              prose-strong:text-brand-black prose-strong:font-bold 
+              prose-em:text-brand-green prose-em:font-serif prose-em:italic 
+              prose-blockquote:border-l-4 prose-blockquote:border-brand-green prose-blockquote:bg-brand-green/5 prose-blockquote:py-4 prose-blockquote:px-8 prose-blockquote:rounded-r-2xl prose-blockquote:font-serif prose-blockquote:text-xl prose-blockquote:text-slate-700 prose-blockquote:italic prose-blockquote:my-10
+              prose-ul:list-disc prose-ul:pl-6 prose-ul:mb-8 
+              prose-li:text-slate-600 prose-li:mb-2 
+              prose-img:rounded-3xl prose-img:shadow-xl prose-img:mx-auto prose-img:my-12
+            ">
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]} 
                 rehypePlugins={[rehypeSanitize]}
