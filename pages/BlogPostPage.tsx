@@ -150,7 +150,7 @@ const BlogPostPage: React.FC = () => {
               </p>
               
               <a 
-                href={`https://wa.me/58414XXXXXXX?text=Hola,%20leí%20el%20artículo%20"${post.title}"%20y%20quisiera%20asesoría`}
+                href={`https://wa.me/584246926562?text=Hola,%20leí%20el%20artículo%20"${post.title}"%20y%20quisiera%20asesoría`}
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-brand-green hover:bg-[#00D09B] text-white font-bold py-4 px-8 rounded-full transition-all hover:scale-105 shadow-lg relative z-10"
