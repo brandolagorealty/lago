@@ -14,6 +14,7 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ post, onClose, onSave, onToast 
   const [title, setTitle] = useState(post?.title || '');
   const [slug, setSlug] = useState(post?.slug || '');
   const [excerpt, setExcerpt] = useState(post?.excerpt || '');
+  const [authorName, setAuthorName] = useState(post?.author_name || 'Redacción Lago');
   const [content, setContent] = useState(post?.content_markdown || '');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(post?.image_url || '');
@@ -82,6 +83,7 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ post, onClose, onSave, onToast 
       title,
       slug,
       excerpt,
+      author_name: authorName,
       content_markdown: content,
       image_url: imageUrl || undefined,
       is_published: isPublished,
@@ -154,6 +156,17 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ post, onClose, onSave, onToast 
                     onChange={(e) => setSlug(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all font-mono text-sm"
                     placeholder="guia-para-invertir"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Autor</label>
+                  <input
+                    type="text"
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
+                    placeholder="Ej. Juan Pérez"
                   />
                 </div>
 

@@ -208,6 +208,7 @@ export interface BlogPost {
   content_markdown: string;
   image_url?: string;
   author_id?: string;
+  author_name?: string;
   read_time_minutes: number;
   is_published: boolean;
   published_at?: string;
