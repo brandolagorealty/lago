@@ -42,3 +42,82 @@ body {
 .transition-all-slow {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ===== Blog Post - Responsive Tables ===== */
+.prose table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.prose thead {
+  background: #1F3347;
+  color: white;
+}
+
+.prose thead th {
+  padding: 14px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  border-bottom: 2px solid #1F5566;
+  color: white;
+}
+
+.prose thead th:first-child {
+  border-top-left-radius: 16px;
+}
+
+.prose thead th:last-child {
+  border-top-right-radius: 16px;
+}
+
+.prose tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s ease;
+}
+
+.prose tbody tr:hover {
+  background: #f8fafc;
+}
+
+.prose tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 16px;
+}
+
+.prose tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 16px;
+}
+
+.prose tbody td {
+  padding: 12px 16px;
+  vertical-align: top;
+  color: #475569;
+  line-height: 1.5;
+  min-width: 120px;
+}
+
+.prose tbody td strong {
+  color: #1A1A1A;
+}
+
+@media (max-width: 640px) {
+  .prose table {
+    font-size: 0.8rem;
+  }
+
+  .prose thead th,
+  .prose tbody td {
+    padding: 10px 12px;
+    min-width: 100px;
+  }
+}
